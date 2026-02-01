@@ -22,6 +22,8 @@ import (
 
 var SttInitFunc func() error
 
+var ProductivityImgPath = "./productivity-images"
+
 func apiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Headers", "*")
@@ -65,6 +67,10 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		handleGetVersionInfo(w)
 	case "generate_certs":
 		handleGenerateCerts(w)
+	case "set_productivity_api":
+		handleSetProductivityAPI(w, r)
+	case "get_productivity_api":
+		handleGetProductivityAPI(w)
 	case "is_api_v3":
 		fmt.Fprintf(w, "it is!")
 	default:
@@ -200,6 +206,70 @@ func handleSetWeatherAPI(w http.ResponseWriter, r *http.Request) {
 func handleGetWeatherAPI(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(vars.APIConfig.Weather)
+}
+
+func handleSetProductivityAPI(w http.ResponseWriter, r *http.Request) {
+	// 10MB limit for image uploads
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Error parsing form data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	provider := r.FormValue("provider")
+	key := r.FormValue("key")
+	urlVal := r.FormValue("url")
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	targetRobot := r.FormValue("target_robot")
+	manualConfig := r.FormValue("manual_config")
+
+	vars.APIConfig.Productivity.Enable = (provider != "" && provider != "None")
+	vars.APIConfig.Productivity.Provider = provider
+	vars.APIConfig.Productivity.Key = strings.TrimSpace(key)
+	vars.APIConfig.Productivity.Url = strings.TrimSpace(urlVal)
+	vars.APIConfig.Productivity.Username = strings.TrimSpace(username)
+	vars.APIConfig.Productivity.Password = strings.TrimSpace(password)
+	vars.APIConfig.Productivity.TargetRobot = strings.TrimSpace(targetRobot)
+	vars.APIConfig.Productivity.ManualConfig = manualConfig
+
+	files := r.MultipartForm.File["files"]
+	if len(files) > 0 {
+		if _, err := os.Stat(ProductivityImgPath); os.IsNotExist(err) {
+			os.MkdirAll(ProductivityImgPath, 0755)
+		}
+
+		for _, fileHeader := range files {
+			file, err := fileHeader.Open()
+			if err != nil {
+				logger.Println("Error opening uploaded file:", err)
+				continue
+			}
+			defer file.Close()
+
+			filename := filepath.Base(fileHeader.Filename)
+			dstPath := filepath.Join(ProductivityImgPath, filename)
+
+			dst, err := os.Create(dstPath)
+			if err != nil {
+				logger.Println("Error creating destination file:", err)
+				continue
+			}
+			defer dst.Close()
+
+			if _, err := io.Copy(dst, file); err != nil {
+				logger.Println("Error saving file:", err)
+			}
+		}
+	}
+
+	vars.WriteConfigToDisk()
+	fmt.Fprint(w, "Productivity settings applied.")
+}
+
+func handleGetProductivityAPI(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vars.APIConfig.Productivity)
 }
 
 func handleSetKGAPI(w http.ResponseWriter, r *http.Request) {
