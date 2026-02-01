@@ -204,6 +204,13 @@
           <hr class="small-hr">
           <div id="addProductivityProviderAPI"></div>
           <form id="productivityAPIAddForm" enctype="multipart/form-data">
+            
+            <label for="targetBot">Target Robot:</label>
+            <select name="targetBot" id="targetBot" form="productivityAPIAddForm">
+              <option value="" selected>None (First Available)</option>
+            </select><br />
+            <small class="desc" style="display:block; margin-bottom:10px;">Select the robot that will perform the reminders.</small>
+
             <label for="productivityProvider">Productivity API Provider:</label>
             <select name="productivityProvider" id="productivityProvider" form="productivityAPIAddForm" onchange="checkProductivity()">
               <option value="" selected>None</option>
@@ -260,6 +267,7 @@
         <div id="addProductivityProviderAPIStatus"></div>
         <hr />
       </div>
+
       <div id="section-restart" style="display: none">
         <h3>Restart Wire-Pod</h3>
         <div>

@@ -243,6 +243,38 @@ function updateWeatherAPI() {
     });
 }
 
+function populateRobotList() {
+  return fetch("/api-sdk/get_sdk_info")
+    .then((response) => {
+        if (!response.ok) return Promise.resolve(); 
+        return response.json();
+    })
+    .then((jsonResp) => {
+        const botList = getE("targetBot");
+        
+        if (jsonResp && jsonResp["robots"]) {
+            for (var i = 0; i < jsonResp["robots"].length; i++) {
+                let exists = false;
+                for (let j = 0; j < botList.options.length; j++) {
+                    if (botList.options[j].value === jsonResp["robots"][i]["esn"]) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    var option = document.createElement("option");
+                    option.text = jsonResp["robots"][i]["esn"];
+                    option.value = jsonResp["robots"][i]["esn"];
+                    botList.add(option);
+                }
+            }
+        }
+    })
+    .catch((error) => {
+        console.error('Unable to get SDK info:', error);
+    });
+}
+
 function checkProductivity() {
   const provider = getE("productivityProvider").value;
 
@@ -269,7 +301,6 @@ function startNextcloudAuth() {
     return;
   }
 
-  // NOTE: Might require a backend proxy to avoid CORS.
   const statusEl = getE("ncAuthStatus");
   statusEl.innerHTML = "Initiating Login Flow...";
 
@@ -307,7 +338,6 @@ function pollNextcloudAuth(token, endpoint) {
            }
        })
        .catch(err => {
-           // Polling errors are expected until approval
        });
    }, 2000);
 }
@@ -339,7 +369,6 @@ function addReminderBlock(data = null) {
     <label>ID / Name:</label>
     <input type="text" class="tinput reminder-id-val" value="${reminderName}" placeholder="e.g. meds_morning"><br>
 
-    <!-- File Input for Image -->
     <label>Image:</label><br>
     <input type="hidden" class="reminder-img-existing" value="${reminderImage}">
     ${reminderImage ? `<small style="color:gray;">Current: ${reminderImage}</small><br>` : ''}
@@ -352,11 +381,12 @@ function addReminderBlock(data = null) {
     <label>Schedule Type:</label>
     <select class="reminder-schedule-type" onchange="toggleScheduleType('${id}', this.value)">
       <option value="daily" ${scheduleType === 'daily' ? 'selected' : ''}>Daily (Specific Time)</option>
+      <option value="weekly" ${scheduleType === 'weekly' ? 'selected' : ''}>Weekly (Specific Days)</option>
+      <option value="hourly" ${scheduleType === 'hourly' ? 'selected' : ''}>Hourly</option>
       <option value="random_interval" ${scheduleType === 'random_interval' ? 'selected' : ''}>Random Interval</option>
     </select>
 
     <div class="schedule-options" id="${id}_schedule_options">
-       <!-- Populated by toggleScheduleType -->
     </div>
   `;
 
@@ -365,7 +395,7 @@ function addReminderBlock(data = null) {
   if (data && data.phrases) {
       data.phrases.forEach(phrase => addPhraseInput(`${id}_phrases`, phrase));
   } else {
-      addPhraseInput(`${id}_phrases`); 
+      addPhraseInput(`${id}_phrases`);
   }
 
   toggleScheduleType(id, scheduleType, data ? data.schedule : null);
@@ -392,6 +422,32 @@ function toggleScheduleType(reminderId, type, existingData = null) {
       <label>Time (HH:MM):</label>
       <input type="time" class="tinput sched-daily-time" value="${timeVal}">
     `;
+  } else if (type === "weekly") {
+    const timeVal = existingData ? existingData.time : "08:00";
+    const days = existingData && existingData.days ? existingData.days : [];
+    
+    const isChecked = (day) => days.includes(day) ? "checked" : "";
+
+    container.innerHTML = `
+      <label>Days of the Week:</label><br>
+      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 10px;">
+         <label><input type="checkbox" class="sched-weekly-day" value="Mon" ${isChecked('Mon')}> Mon</label>
+         <label><input type="checkbox" class="sched-weekly-day" value="Tue" ${isChecked('Tue')}> Tue</label>
+         <label><input type="checkbox" class="sched-weekly-day" value="Wed" ${isChecked('Wed')}> Wed</label>
+         <label><input type="checkbox" class="sched-weekly-day" value="Thu" ${isChecked('Thu')}> Thu</label>
+         <label><input type="checkbox" class="sched-weekly-day" value="Fri" ${isChecked('Fri')}> Fri</label>
+         <label><input type="checkbox" class="sched-weekly-day" value="Sat" ${isChecked('Sat')}> Sat</label>
+         <label><input type="checkbox" class="sched-weekly-day" value="Sun" ${isChecked('Sun')}> Sun</label>
+      </div>
+      <label>Time (HH:MM):</label>
+      <input type="time" class="tinput sched-weekly-time" value="${timeVal}">
+    `;
+  } else if (type === "hourly") {
+     const minVal = existingData ? existingData.minute : "0";
+     container.innerHTML = `
+       <label>Minute past the hour (0-59):</label>
+       <input type="number" min="0" max="59" class="tinput sched-hourly-minute" value="${minVal}" style="width: 80px;">
+     `;
   } else if (type === "random_interval") {
     const minVal = existingData ? existingData.min_minutes : "60";
     const maxVal = existingData ? existingData.max_minutes : "120";
@@ -432,6 +488,13 @@ function collectManualConfigData(formDataObj) {
 
     if (schedType === "daily") {
         schedule.time = block.querySelector(".sched-daily-time").value;
+    } else if (schedType === "weekly") {
+        schedule.time = block.querySelector(".sched-weekly-time").value;
+        const days = [];
+        block.querySelectorAll(".sched-weekly-day:checked").forEach(chk => days.push(chk.value));
+        schedule.days = days;
+    } else if (schedType === "hourly") {
+        schedule.minute = parseInt(block.querySelector(".sched-hourly-minute").value) || 0;
     } else {
         schedule.min_minutes = parseInt(block.querySelector(".sched-rnd-min").value) || 60;
         schedule.max_minutes = parseInt(block.querySelector(".sched-rnd-max").value) || 120;
@@ -456,6 +519,7 @@ function sendProductivityAPIKey() {
   const formData = new FormData();
 
   formData.append("provider", provider);
+  formData.append("target_robot", getE("targetBot").value);
 
   if (provider === "google_calendar" || provider === "todoist") {
     formData.append("key", getE("prodApiKey").value);
@@ -464,7 +528,7 @@ function sendProductivityAPIKey() {
     formData.append("username", getE("ncUser").value);
     formData.append("password", getE("ncPass").value);
   }
-  
+
   const manualConfigArray = collectManualConfigData(formData);
   formData.append("manual_config", JSON.stringify(manualConfigArray));
 
@@ -484,39 +548,45 @@ function sendProductivityAPIKey() {
 }
 
 function updateProductivityAPI() {
-  fetch("/api/get_productivity_api")
-    .then((response) => response.json())
-    .then((data) => {
-      if (data) {
-          getE("productivityProvider").value = data.provider;
-          getE("prodApiKey").value = data.key || "";
-          getE("ncUrl").value = data.url || "";
-          getE("ncUser").value = data.username || "";
-          getE("ncPass").value = data.password || "";
-
-          if (data.manual_config && data.manual_config.length > 2) { 
-              getE("enableManualReminders").checked = true;
-              toggleManualReminders();
-              try {
-                  const config = JSON.parse(data.manual_config);
-                  getE("manualRemindersContainer").innerHTML = ""; 
-                  if (Array.isArray(config)) {
-                      config.forEach(item => addReminderBlock(item));
-                  }
-              } catch (e) {
-                  console.error("Error parsing manual config", e);
+  populateRobotList().then(() => {
+      fetch("/api/get_productivity_api")
+        .then((response) => response.json())
+        .then((data) => {
+          if (data) {
+              getE("productivityProvider").value = data.provider;
+              getE("prodApiKey").value = data.key || "";
+              getE("ncUrl").value = data.url || "";
+              getE("ncUser").value = data.username || "";
+              getE("ncPass").value = data.password || "";
+              
+              if (data.target_robot) {
+                  getE("targetBot").value = data.target_robot;
               }
-          } else {
-             getE("enableManualReminders").checked = false;
-             toggleManualReminders();
-          }
 
-          checkProductivity();
-      }
-    })
-    .catch(() => {
-        checkProductivity();
-    });
+              if (data.manual_config && data.manual_config.length > 2) { 
+                  getE("enableManualReminders").checked = true;
+                  toggleManualReminders();
+                  try {
+                      const config = JSON.parse(data.manual_config);
+                      getE("manualRemindersContainer").innerHTML = ""; 
+                      if (Array.isArray(config)) {
+                          config.forEach(item => addReminderBlock(item));
+                      }
+                  } catch (e) {
+                      console.error("Error parsing manual config", e);
+                  }
+              } else {
+                 getE("enableManualReminders").checked = false;
+                 toggleManualReminders();
+              }
+
+              checkProductivity();
+          }
+        })
+        .catch(() => {
+            checkProductivity();
+        });
+  });
 }
 
 function checkKG() {
