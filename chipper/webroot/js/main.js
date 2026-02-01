@@ -3,7 +3,7 @@ const intentsJson = JSON.parse(
 );
 
 var GetLog = false;
-let reminderCounter = 0; 
+let reminderCounter = 0;
 
 const getE = (element) => document.getElementById(element);
 
@@ -359,6 +359,7 @@ function addReminderBlock(data = null) {
   const reminderName = data ? data.id : "reminder" + Math.random().toString(36).substring(2, 10);
   const reminderImage = data ? data.image : "";
   const scheduleType = data && data.schedule ? data.schedule.type : "daily";
+  const requireConfirm = data && data.require_confirmation === true ? "checked" : "";
 
   block.innerHTML = `
     <div class="reminder-header">
@@ -366,8 +367,12 @@ function addReminderBlock(data = null) {
       <button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">Remove</button>
     </div>
 
-    <!-- Hidden ID Field -->
     <input type="hidden" class="reminder-id-val" value="${reminderName}">
+
+    <div style="margin-bottom:10px;">
+       <input type="checkbox" class="reminder-req-confirm" id="${id}_confirm" ${requireConfirm}>
+       <label for="${id}_confirm" class="checkbox-label">Requires verbal confirmation ("Yes")?</label>
+    </div>
 
     <label>Image:</label><br>
     <input type="hidden" class="reminder-img-existing" value="${reminderImage}">
@@ -475,6 +480,7 @@ function collectManualConfigData(formDataObj) {
     const id = block.querySelector(".reminder-id-val").value;
     const existingImage = block.querySelector(".reminder-img-existing").value;
     const fileInput = block.querySelector(".reminder-file-input");
+    const requireConfirm = block.querySelector(".reminder-req-confirm").checked;
 
     let imageName = existingImage;
     if (fileInput.files.length > 0) {
@@ -510,6 +516,7 @@ function collectManualConfigData(formDataObj) {
             id: id,
             image: imageName,
             phrases: phrases,
+            require_confirmation: requireConfirm,
             schedule: schedule
         });
     }
