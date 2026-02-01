@@ -3,6 +3,7 @@ const intentsJson = JSON.parse(
 );
 
 var GetLog = false;
+let reminderCounter = 0;
 
 const getE = (element) => document.getElementById(element);
 
@@ -243,14 +244,220 @@ function updateWeatherAPI() {
 }
 
 function checkProductivity() {
-  getE("productivityKeySpan").style.display = getE("productivityProvider").value ? "block" : "none";
+  const provider = getE("productivityProvider").value;
+
+  getE("productivityKeySpan").style.display = "none";
+  getE("nextcloudInput").style.display = "none";
+
+  if (provider === "google_calendar") {
+    getE("productivityKeySpan").style.display = "block";
+    getE("prodKeyLabel").innerHTML = "Credentials (JSON) / OAuth Token:";
+    getE("prodApiKey").placeholder = "{ \"type\": \"service_account\", ... }";
+  } else if (provider === "todoist") {
+    getE("productivityKeySpan").style.display = "block";
+    getE("prodKeyLabel").innerHTML = "API Token:";
+    getE("prodApiKey").placeholder = "0123456789abcdef...";
+  } else if (provider === "nextcloud") {
+    getE("nextcloudInput").style.display = "block";
+  }
+}
+
+function startNextcloudAuth() {
+  const url = getE("ncUrl").value;
+  if (!url) {
+    alert("Please enter your Nextcloud Instance URL first.");
+    return;
+  }
+
+  // NOTE: Might require a backend proxy to avoid CORS.
+  const statusEl = getE("ncAuthStatus");
+  statusEl.innerHTML = "Initiating Login Flow...";
+
+  fetch(url.replace(/\/$/, "") + "/index.php/login/v2", {
+      method: "POST",
+  })
+  .then(res => res.json())
+  .then(data => {
+      if (data.login && data.poll) {
+          statusEl.innerHTML = `Please <a href="${data.login}" target="_blank" style="color:cyan; text-decoration:underline;">Click Here to Login</a> then return.`;
+          pollNextcloudAuth(data.poll.token, data.poll.endpoint);
+      } else {
+          statusEl.innerHTML = "Error: Invalid response from Nextcloud.";
+      }
+  })
+  .catch(err => {
+      console.error(err);
+      statusEl.innerHTML = "Error contacting Nextcloud. Check console/CORS.";
+  });
+}
+
+function pollNextcloudAuth(token, endpoint) {
+   const statusEl = getE("ncAuthStatus");
+   const interval = setInterval(() => {
+       fetch(endpoint + "?token=" + token, {
+           method: "POST"
+       })
+       .then(res => res.json())
+       .then(data => {
+           if (data.loginName && data.appPassword) {
+               clearInterval(interval);
+               getE("ncUser").value = data.loginName;
+               getE("ncPass").value = data.appPassword;
+               statusEl.innerHTML = "Success! Credentials captured.";
+           }
+       })
+       .catch(err => {
+           // Polling errors are expected until approval
+       });
+   }, 2000);
+}
+
+function toggleManualReminders() {
+   const enabled = getE("enableManualReminders").checked;
+   getE("manualRemindersWrapper").style.display = enabled ? "block" : "none";
+}
+
+function addReminderBlock(data = null) {
+  reminderCounter++;
+  const id = `rem_${reminderCounter}`;
+  const container = getE("manualRemindersContainer");
+
+  const block = document.createElement("div");
+  block.className = "reminder-block";
+  block.id = id;
+
+  const reminderName = data ? data.id : "";
+  const reminderImage = data ? data.image : "";
+  const scheduleType = data && data.schedule ? data.schedule.type : "daily";
+
+  block.innerHTML = `
+    <div class="reminder-header">
+      <h4 style="margin:0;">Reminder #${reminderCounter}</h4>
+      <button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">Remove</button>
+    </div>
+
+    <label>ID / Name:</label>
+    <input type="text" class="tinput reminder-id-val" value="${reminderName}" placeholder="e.g. meds_morning"><br>
+
+    <label>Image Filename:</label>
+    <input type="text" class="tinput reminder-img-val" value="${reminderImage}" placeholder="e.g. pill_icon.png"><br>
+
+    <label>Phrases:</label>
+    <div class="phrases-container" id="${id}_phrases"></div>
+    <button type="button" class="add-btn-small" onclick="addPhraseInput('${id}_phrases')">+ Add Phrase</button><br><br>
+
+    <label>Schedule Type:</label>
+    <select class="reminder-schedule-type" onchange="toggleScheduleType('${id}', this.value)">
+      <option value="daily" ${scheduleType === 'daily' ? 'selected' : ''}>Daily (Specific Time)</option>
+      <option value="random_interval" ${scheduleType === 'random_interval' ? 'selected' : ''}>Random Interval</option>
+    </select>
+
+    <div class="schedule-options" id="${id}_schedule_options">
+       <!-- Populated by toggleScheduleType -->
+    </div>
+  `;
+
+  container.appendChild(block);
+
+  if (data && data.phrases) {
+      data.phrases.forEach(phrase => addPhraseInput(`${id}_phrases`, phrase));
+  } else {
+      addPhraseInput(`${id}_phrases`); 
+  }
+
+  toggleScheduleType(id, scheduleType, data ? data.schedule : null);
+}
+
+function addPhraseInput(containerId, value = "") {
+  const container = getE(containerId);
+  const div = document.createElement("div");
+  div.className = "phrase-row";
+  div.innerHTML = `
+    <input type="text" class="tinput phrase-val" value="${value}" style="width: 80%;" placeholder="Spoken phrase...">
+    <button type="button" class="remove-btn" style="background:#666;" onclick="this.parentElement.remove()">X</button>
+  `;
+  container.appendChild(div);
+}
+
+function toggleScheduleType(reminderId, type, existingData = null) {
+  const container = getE(`${reminderId}_schedule_options`);
+  container.innerHTML = "";
+
+  if (type === "daily") {
+    const timeVal = existingData ? existingData.time : "08:00";
+    container.innerHTML = `
+      <label>Time (HH:MM):</label>
+      <input type="time" class="tinput sched-daily-time" value="${timeVal}">
+    `;
+  } else if (type === "random_interval") {
+    const minVal = existingData ? existingData.min_minutes : "60";
+    const maxVal = existingData ? existingData.max_minutes : "120";
+    container.innerHTML = `
+      <label>Min Minutes:</label>
+      <input type="number" class="tinput sched-rnd-min" value="${minVal}" style="width: 80px;">
+      <label>Max Minutes:</label>
+      <input type="number" class="tinput sched-rnd-max" value="${maxVal}" style="width: 80px;">
+    `;
+  }
+}
+
+function getManualConfigFromUI() {
+  const enabled = getE("enableManualReminders").checked;
+  if (!enabled) return "";
+
+  const blocks = document.querySelectorAll("#manualRemindersContainer .reminder-block");
+  const config = [];
+
+  blocks.forEach(block => {
+    const id = block.querySelector(".reminder-id-val").value;
+    const image = block.querySelector(".reminder-img-val").value;
+
+    const phrases = [];
+    block.querySelectorAll(".phrase-val").forEach(input => {
+        if(input.value.trim() !== "") phrases.push(input.value.trim());
+    });
+
+    const schedType = block.querySelector(".reminder-schedule-type").value;
+    let schedule = { type: schedType };
+
+    if (schedType === "daily") {
+        schedule.time = block.querySelector(".sched-daily-time").value;
+    } else {
+        schedule.min_minutes = parseInt(block.querySelector(".sched-rnd-min").value) || 60;
+        schedule.max_minutes = parseInt(block.querySelector(".sched-rnd-max").value) || 120;
+    }
+
+    if (id) {
+        config.push({
+            id: id,
+            image: image,
+            phrases: phrases,
+            schedule: schedule
+        });
+    }
+  });
+
+  return JSON.stringify(config);
 }
 
 function sendProductivityAPIKey() {
+  const provider = getE("productivityProvider").value;
   const data = {
-    provider: getE("productivityProvider").value,
-    key: getE("prodApiKey").value,
+    provider: provider,
+    key: "",
+    url: "",
+    username: "",
+    password: "",
+    manual_config: getManualConfigFromUI()
   };
+
+  if (provider === "google_calendar" || provider === "todoist") {
+    data.key = getE("prodApiKey").value;
+  } else if (provider === "nextcloud") {
+    data.url = getE("ncUrl").value;
+    data.username = getE("ncUser").value;
+    data.password = getE("ncPass").value;
+  }
 
   displayMessage("addProductivityProviderAPIStatus", "Saving...");
 
@@ -273,9 +480,33 @@ function updateProductivityAPI() {
     .then((data) => {
       if (data) {
           getE("productivityProvider").value = data.provider;
-          getE("prodApiKey").value = data.key;
+          getE("prodApiKey").value = data.key || "";
+          getE("ncUrl").value = data.url || "";
+          getE("ncUser").value = data.username || "";
+          getE("ncPass").value = data.password || "";
+
+          if (data.manual_config && data.manual_config.length > 2) { 
+              getE("enableManualReminders").checked = true;
+              toggleManualReminders();
+              try {
+                  const config = JSON.parse(data.manual_config);
+                  getE("manualRemindersContainer").innerHTML = ""; 
+                  if (Array.isArray(config)) {
+                      config.forEach(item => addReminderBlock(item));
+                  }
+              } catch (e) {
+                  console.error("Error parsing manual config", e);
+              }
+          } else {
+             getE("enableManualReminders").checked = false;
+             toggleManualReminders();
+          }
+
           checkProductivity();
       }
+    })
+    .catch(() => {
+        checkProductivity();
     });
 }
 

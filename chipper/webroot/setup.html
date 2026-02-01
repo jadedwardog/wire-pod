@@ -209,41 +209,56 @@
               <option value="" selected>None</option>
               <option value="google_calendar">Google Calendar</option>
               <option value="todoist">Todoist</option>
-              <option value="nextcloud">Nextcloud (CalDAV)</option>
-              <option value="manual">Manual / Native Script</option>
+              <option value="nextcloud">Nextcloud</option>
             </select><br />
 
             <span id="productivityKeySpan" style="display: none">
-               <label for="prodApiKey">API Key:</label><br />
-               <input class="tinput" type="text" name="prodApiKey" id="prodApiKey" /><br />
+               <label id="prodKeyLabel" for="prodApiKey">API Token:</label><br />
+               <textarea class="tinput" name="prodApiKey" id="prodApiKey" style="height: 100px; width: 400px; font-family: monospace;"></textarea><br />
             </span>
 
             <span id="nextcloudInput" style="display: none">
                <label for="ncUrl">Nextcloud Instance URL:</label><br />
                <input class="tinput" type="text" name="ncUrl" id="ncUrl" placeholder="https://cloud.example.com" /><br />
-               <label for="ncUser">Username:</label><br />
-               <input class="tinput" type="text" name="ncUser" id="ncUser" /><br />
-               <label for="ncPass">App Password / Token:</label><br />
-               <input class="tinput" type="password" name="ncPass" id="ncPass" /><br />
-            </span>
-
-            <span id="manualInput" style="display: none; text-align: left;">
-               <div id="manualRemindersContainer">
-                 <!-- Reminders will be injected here via JS -->
+               <br/>
+               <div id="ncLoginFlow">
+                  <button type="button" onclick="startNextcloudAuth()">Start Login Flow</button>
+                  <p id="ncAuthStatus" class="desc" style="font-size: 0.8em; margin-top:5px;"></p>
                </div>
-               <button type="button" onclick="addReminderBlock()" style="margin-top: 10px; width: 100%; padding: 10px; background-color: #4CAF50;">
-                 <i class="fa-solid fa-plus"></i> Add Reminder
-               </button>
+               <br/>
+               <label for="ncUser">Username:</label><br />
+               <input class="tinput" type="text" name="ncUser" id="ncUser" placeholder="Auto-filled via Login Flow" /><br />
+               <label for="ncPass">App Password / Token:</label><br />
+               <input class="tinput" type="password" name="ncPass" id="ncPass" placeholder="Auto-filled via Login Flow" /><br />
             </span>
 
           </form>
-          <hr class="small-hr">
-          <button onclick="sendProductivityAPIKey()">
-            Apply Productivity Settings
-          </button>
-          <div id="addProductivityProviderAPIStatus"></div>
-          <hr />
         </div>
+
+        <hr class="small-hr">
+
+        <div id="manualInputSection" style="text-align: left; margin-top: 20px;">
+           <div style="text-align: center; margin-bottom: 15px;">
+              <input type="checkbox" id="enableManualReminders" onchange="toggleManualReminders()">
+              <label class="checkbox-label" for="enableManualReminders">Enable Native Reminders</label>
+           </div>
+           
+           <div id="manualRemindersWrapper" style="display: none;">
+              <div id="manualRemindersContainer">
+                 <!-- Reminders will be injected here via JS -->
+              </div>
+              <button type="button" onclick="addReminderBlock()" style="margin-top: 10px; width: 100%; padding: 10px; background-color: #4CAF50;">
+                 <i class="fa-solid fa-plus"></i> Add Reminder
+              </button>
+           </div>
+        </div>
+
+        <hr class="small-hr">
+        <button onclick="sendProductivityAPIKey()">
+          Apply Productivity Settings
+        </button>
+        <div id="addProductivityProviderAPIStatus"></div>
+        <hr />
       </div>
 
       <div id="section-restart" style="display: none">
