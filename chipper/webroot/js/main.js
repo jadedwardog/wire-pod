@@ -356,7 +356,7 @@ function addReminderBlock(data = null) {
   block.className = "reminder-block";
   block.id = id;
 
-  const reminderName = data ? data.id : "";
+  const reminderName = data ? data.id : "reminder" + Math.random().toString(36).substring(2, 10);
   const reminderImage = data ? data.image : "";
   const scheduleType = data && data.schedule ? data.schedule.type : "daily";
 
@@ -366,8 +366,8 @@ function addReminderBlock(data = null) {
       <button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">Remove</button>
     </div>
 
-    <label>ID / Name:</label>
-    <input type="text" class="tinput reminder-id-val" value="${reminderName}" placeholder="e.g. meds_morning"><br>
+    <!-- Hidden ID Field -->
+    <input type="hidden" class="reminder-id-val" value="${reminderName}">
 
     <label>Image:</label><br>
     <input type="hidden" class="reminder-img-existing" value="${reminderImage}">
