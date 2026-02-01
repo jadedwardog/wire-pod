@@ -269,6 +269,51 @@ canvas{
   height:400px !important;
 }
 
+/* added syles for manual reminder setup */
+.reminder-block {
+  background: #2a2a2a;
+  padding: 15px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  border: 1px solid #444;
+}
+
+.reminder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.phrase-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+
+.remove-btn {
+  background: #ff4444;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-btn-small {
+  background: #444;
+  font-size: 0.8em;
+  padding: 5px;
+  margin-top: 5px;
+}
+
+.schedule-options {
+  margin-top: 10px;
+  padding: 10px;
+  background: #333;
+  border-radius: 4px;
+}
+
 /* RADIO BUTTON ######################### */
 input[type='radio'] {
   appearance: none;

@@ -33,6 +33,10 @@
               name="icon"></i><br />Knowledge Graph</a>
         </div>
         <div class="main-nav-child">
+          <a href="#" onclick="showProductivity(); return false;"><i class="fa-solid fa-calendar-days" id="icon-Productivity"
+              name="icon"></i><br />Productivity</a>
+        </div>
+        <div class="main-nav-child">
           <a href="#" onclick="showLanguage(); return false;"><i class="fa-solid fa-language" id="icon-Language"
               name="icon"></i><br />Set Language</a>
         </div>
@@ -192,6 +196,34 @@
         <hr />
       </div>
 
+      <div id="section-productivity" style="display: none">
+        <h3>Productivity API Setup</h3>
+        <hr class="small-hr">
+        <div>
+          <p>Select the productivity provider you'd like to use.</p>
+          <hr class="small-hr">
+          <div id="addProductivityProviderAPI"></div>
+          <form id="productivityAPIAddForm">
+            <label for="productivityProvider">Productivity API Provider:</label>
+            <select name="productivityProvider" id="productivityProvider" form="productivityAPIAddForm" onchange="checkProductivity()">
+              <option value="" selected>None</option>
+              <option value="google_calendar">Google Calendar</option>
+              <option value="todoist">Todoist</option>
+            </select><br />
+            <span id="productivityKeySpan" style="display: none">
+               <label for="prodApiKey">API Key:</label><br />
+               <input class="tinput" type="text" name="prodApiKey" id="prodApiKey" /><br />
+            </span>
+          </form>
+          <hr class="small-hr">
+          <button onclick="sendProductivityAPIKey()">
+            Apply Productivity Settings
+          </button>
+          <div id="addProductivityProviderAPIStatus"></div>
+          <hr />
+        </div>
+      </div>
+
       <div id="section-restart" style="display: none">
         <h3>Restart Wire-Pod</h3>
         <div>
@@ -250,6 +282,7 @@
 <script>
   updateWeatherAPI();
   updateKGAPI();
+  // Ensure I add updateProductivityAPI() here later once defined in js/main.js
 </script>
 
 </html>

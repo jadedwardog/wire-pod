@@ -242,6 +242,43 @@ function updateWeatherAPI() {
     });
 }
 
+function checkProductivity() {
+  getE("productivityKeySpan").style.display = getE("productivityProvider").value ? "block" : "none";
+}
+
+function sendProductivityAPIKey() {
+  const data = {
+    provider: getE("productivityProvider").value,
+    key: getE("prodApiKey").value,
+  };
+
+  displayMessage("addProductivityProviderAPIStatus", "Saving...");
+
+  fetch("/api/set_productivity_api", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+    .then((response) => response.text())
+    .then((response) => {
+      displayMessage("addProductivityProviderAPIStatus", response);
+    });
+}
+
+function updateProductivityAPI() {
+  fetch("/api/get_productivity_api")
+    .then((response) => response.json())
+    .then((data) => {
+      if (data) {
+          getE("productivityProvider").value = data.provider;
+          getE("prodApiKey").value = data.key;
+          checkProductivity();
+      }
+    });
+}
+
 function checkKG() {
   const provider = getE("kgProvider").value;
   const elements = [
@@ -573,7 +610,7 @@ function checkUpdate() {
 }
 
 function showLanguage() {
-  toggleVisibility(["section-weather", "section-restart", "section-kg", "section-language"], "section-language", "icon-Language");
+  toggleVisibility(["section-weather", "section-restart", "section-kg", "section-productivity", "section-language"], "section-language", "icon-Language");
   fetch("/api/get_stt_info")
     .then((response) => response.json())
     .then((parsed) => {
@@ -597,11 +634,15 @@ function showIntents() {
 }
 
 function showWeather() {
-  toggleVisibility(["section-weather", "section-restart", "section-language", "section-kg"], "section-weather", "icon-Weather");
+  toggleVisibility(["section-weather", "section-restart", "section-language", "section-productivity", "section-kg"], "section-weather", "icon-Weather");
+}
+
+function showProductivity() {
+  toggleVisibility(["section-weather", "section-restart", "section-language", "section-kg", "section-productivity"], "section-productivity", "icon-Productivity");
 }
 
 function showKG() {
-  toggleVisibility(["section-weather", "section-restart", "section-language", "section-kg"], "section-kg", "icon-KG");
+  toggleVisibility(["section-weather", "section-restart", "section-language", "section-productivity", "section-kg"], "section-kg", "icon-KG");
 }
 
 function toggleVisibility(sections, sectionToShow, iconId) {
