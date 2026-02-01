@@ -529,9 +529,9 @@ input[type='radio']:disabled:after {
   width: auto;
   background: rgba(30, 30, 30, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  min-width: 85px;
+  min-width: 105px;
   transition: all 0.3s ease-in-out;
-  width: 85px;
+  width: 105px;
 }
 
 .main-nav-child:has(.selectedicon) {

@@ -412,33 +412,39 @@ function addPhraseInput(containerId, value = "") {
   container.appendChild(div);
 }
 
+function getDaysCheckboxHTML(existingDays = []) {
+    const isChecked = (day) => existingDays.includes(day) ? "checked" : "";
+    return `
+      <label>Run only on specific days (Optional):</label><br>
+      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 10px;">
+         <label><input type="checkbox" class="sched-day-check" value="Mon" ${isChecked('Mon')}> Mon</label>
+         <label><input type="checkbox" class="sched-day-check" value="Tue" ${isChecked('Tue')}> Tue</label>
+         <label><input type="checkbox" class="sched-day-check" value="Wed" ${isChecked('Wed')}> Wed</label>
+         <label><input type="checkbox" class="sched-day-check" value="Thu" ${isChecked('Thu')}> Thu</label>
+         <label><input type="checkbox" class="sched-day-check" value="Fri" ${isChecked('Fri')}> Fri</label>
+         <label><input type="checkbox" class="sched-day-check" value="Sat" ${isChecked('Sat')}> Sat</label>
+         <label><input type="checkbox" class="sched-day-check" value="Sun" ${isChecked('Sun')}> Sun</label>
+      </div>
+    `;
+}
+
 function toggleScheduleType(reminderId, type, existingData = null) {
   const container = getE(`${reminderId}_schedule_options`);
   container.innerHTML = "";
+  
+  const existingDays = existingData && existingData.days ? existingData.days : [];
 
   if (type === "daily") {
     const timeVal = existingData ? existingData.time : "08:00";
     container.innerHTML = `
+      ${getDaysCheckboxHTML(existingDays)}
       <label>Time (HH:MM):</label>
       <input type="time" class="tinput sched-daily-time" value="${timeVal}">
     `;
   } else if (type === "weekly") {
     const timeVal = existingData ? existingData.time : "08:00";
-    const days = existingData && existingData.days ? existingData.days : [];
-    
-    const isChecked = (day) => days.includes(day) ? "checked" : "";
-
     container.innerHTML = `
-      <label>Days of the Week:</label><br>
-      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 10px;">
-         <label><input type="checkbox" class="sched-weekly-day" value="Mon" ${isChecked('Mon')}> Mon</label>
-         <label><input type="checkbox" class="sched-weekly-day" value="Tue" ${isChecked('Tue')}> Tue</label>
-         <label><input type="checkbox" class="sched-weekly-day" value="Wed" ${isChecked('Wed')}> Wed</label>
-         <label><input type="checkbox" class="sched-weekly-day" value="Thu" ${isChecked('Thu')}> Thu</label>
-         <label><input type="checkbox" class="sched-weekly-day" value="Fri" ${isChecked('Fri')}> Fri</label>
-         <label><input type="checkbox" class="sched-weekly-day" value="Sat" ${isChecked('Sat')}> Sat</label>
-         <label><input type="checkbox" class="sched-weekly-day" value="Sun" ${isChecked('Sun')}> Sun</label>
-      </div>
+      ${getDaysCheckboxHTML(existingDays)}
       <label>Time (HH:MM):</label>
       <input type="time" class="tinput sched-weekly-time" value="${timeVal}">
     `;
@@ -452,10 +458,15 @@ function toggleScheduleType(reminderId, type, existingData = null) {
     const minVal = existingData ? existingData.min_minutes : "60";
     const maxVal = existingData ? existingData.max_minutes : "120";
     container.innerHTML = `
-      <label>Min Minutes:</label>
-      <input type="number" class="tinput sched-rnd-min" value="${minVal}" style="width: 80px;">
-      <label>Max Minutes:</label>
-      <input type="number" class="tinput sched-rnd-max" value="${maxVal}" style="width: 80px;">
+      ${getDaysCheckboxHTML(existingDays)}
+      <div>
+        <label>Min Minutes:</label>
+        <input type="number" class="tinput sched-rnd-min" value="${minVal}" style="width: 80px;">
+      </div>
+      <div>
+        <label>Max Minutes:</label>
+        <input type="number" class="tinput sched-rnd-max" value="${maxVal}" style="width: 80px;">
+      </div>
     `;
   }
 }
@@ -486,13 +497,16 @@ function collectManualConfigData(formDataObj) {
     const schedType = block.querySelector(".reminder-schedule-type").value;
     let schedule = { type: schedType };
 
+    const days = [];
+    block.querySelectorAll(".sched-day-check:checked").forEach(chk => days.push(chk.value));
+    if (days.length > 0) {
+        schedule.days = days;
+    }
+
     if (schedType === "daily") {
         schedule.time = block.querySelector(".sched-daily-time").value;
     } else if (schedType === "weekly") {
         schedule.time = block.querySelector(".sched-weekly-time").value;
-        const days = [];
-        block.querySelectorAll(".sched-weekly-day:checked").forEach(chk => days.push(chk.value));
-        schedule.days = days;
     } else if (schedType === "hourly") {
         schedule.minute = parseInt(block.querySelector(".sched-hourly-minute").value) || 0;
     } else {
