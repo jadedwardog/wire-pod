@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"google.golang.org/protobuf/encoding/protojson"
+
 	"github.com/fforchino/vector-go-sdk/pkg/vector"
 	"github.com/fforchino/vector-go-sdk/pkg/vectorpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
@@ -85,20 +87,15 @@ func processTask(task Task) {
 		return
 	}
 
-	bcClient, err := robot.Conn.AssumeBehaviorControl(ctx)
-	if err != nil {
-		retryTask(task, "AssumeBehaviorControl failed: "+err.Error())
-		return
-	}
-
-	if err := bcClient.Send(&vectorpb.BehaviorControlRequest{
+	bcClient, err := robot.Conn.AssumeBehaviorControl(ctx, &vectorpb.BehaviorControlRequest{
 		RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 			ControlRequest: &vectorpb.ControlRequest{
 				Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
 			},
 		},
-	}); err != nil {
-		retryTask(task, "Send ControlRequest failed: "+err.Error())
+	})
+	if err != nil {
+		retryTask(task, "AssumeBehaviorControl failed: "+err.Error())
 		return
 	}
 
@@ -175,10 +172,7 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 		return false
 	}
 
-	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{
-		ListType:   vectorpb.EventRequest_WHITE_LIST,
-		EventTypes: []vectorpb.EventType{vectorpb.EventType_USER_INTENT},
-	})
+	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{})
 	if err != nil {
 		logger.Println("Productivity: Failed to start event stream: " + err.Error())
 		return false
@@ -197,8 +191,13 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 			if msg != nil && msg.Event != nil {
 				intent := msg.Event.GetUserIntent()
 				if intent != nil {
-					if strings.Contains(intent.IntentId, "intent_imperative_affirmative") ||
-						strings.Contains(intent.IntentId, "intent_global_yes") {
+					b, err := protojson.Marshal(intent)
+					if err != nil {
+						continue
+					}
+					s := string(b)
+					if strings.Contains(s, "intent_imperative_affirmative") ||
+						strings.Contains(s, "intent_global_yes") {
 						responseChan <- true
 						return
 					}
