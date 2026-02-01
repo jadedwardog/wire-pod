@@ -364,7 +364,10 @@ function addReminderBlock(data = null) {
   block.innerHTML = `
     <div class="reminder-header">
       <h4 style="margin:0;">Reminder #${reminderCounter}</h4>
-      <button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">Remove</button>
+      <div>
+        <button type="button" class="test-btn" onclick="testReminder('${id}')" style="background:#2196F3; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;">Test</button>
+        <button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">Remove</button>
+      </div>
     </div>
 
     <input type="hidden" class="reminder-id-val" value="${reminderName}">
@@ -403,6 +406,59 @@ function addReminderBlock(data = null) {
   }
 
   toggleScheduleType(id, scheduleType, data ? data.schedule : null);
+}
+
+function testReminder(id) {
+  const block = document.getElementById(id);
+  const targetBot = getE("targetBot").value;
+  
+  if (!targetBot) {
+      alert("Please select a target robot first.");
+      return;
+  }
+
+  const reminderName = block.querySelector(".reminder-id-val").value;
+  const existingImage = block.querySelector(".reminder-img-existing").value;
+  const fileInput = block.querySelector(".reminder-file-input");
+  const requireConfirm = block.querySelector(".reminder-req-confirm").checked;
+
+  const formData = new FormData();
+  formData.append("target_robot", targetBot);
+
+  let imageName = existingImage;
+  if (fileInput.files.length > 0) {
+      imageName = fileInput.files[0].name;
+      formData.append("files", fileInput.files[0]);
+  }
+
+  const phrases = [];
+  block.querySelectorAll(".phrase-val").forEach(input => {
+      if(input.value.trim() !== "") phrases.push(input.value.trim());
+  });
+
+  const config = {
+      id: reminderName,
+      image: imageName,
+      phrases: phrases,
+      require_confirmation: requireConfirm,
+      schedule: { type: "test" } 
+  };
+
+  formData.append("reminder_config", JSON.stringify(config));
+
+  displayMessage("addProductivityProviderAPIStatus", "Sending test...");
+
+  fetch("/api/test_productivity_reminder", {
+      method: "POST",
+      body: formData
+  })
+  .then(response => response.text())
+  .then(text => {
+      displayMessage("addProductivityProviderAPIStatus", text);
+  })
+  .catch(err => {
+      displayMessage("addProductivityProviderAPIStatus", "Error: " + err);
+  });
 }
 
 function addPhraseInput(containerId, value = "") {

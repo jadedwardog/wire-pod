@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
+	"github.com/kercre123/wire-pod/chipper/pkg/productivity"
 	"github.com/kercre123/wire-pod/chipper/pkg/scripting"
 	"github.com/kercre123/wire-pod/chipper/pkg/vars"
 	"github.com/kercre123/wire-pod/chipper/pkg/wirepod/localization"
@@ -71,6 +72,8 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		handleSetProductivityAPI(w, r)
 	case "get_productivity_api":
 		handleGetProductivityAPI(w)
+	case "test_productivity_reminder":
+		handleTestProductivityReminder(w, r)
 	case "is_api_v3":
 		fmt.Fprintf(w, "it is!")
 	default:
@@ -270,6 +273,60 @@ func handleSetProductivityAPI(w http.ResponseWriter, r *http.Request) {
 func handleGetProductivityAPI(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(vars.APIConfig.Productivity)
+}
+
+func handleTestProductivityReminder(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseMultipartForm(10 << 20)
+	if err != nil {
+		http.Error(w, "Error parsing form data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	targetRobot := r.FormValue("target_robot")
+	if targetRobot == "" {
+		http.Error(w, "Target robot is required", http.StatusBadRequest)
+		return
+	}
+
+	configStr := r.FormValue("reminder_config")
+	var reminder productivity.ManualReminder
+	if err := json.Unmarshal([]byte(configStr), &reminder); err != nil {
+		http.Error(w, "Invalid reminder config", http.StatusBadRequest)
+		return
+	}
+
+	files := r.MultipartForm.File["files"]
+	if len(files) > 0 {
+		if _, err := os.Stat(ProductivityImgPath); os.IsNotExist(err) {
+			os.MkdirAll(ProductivityImgPath, 0755)
+		}
+		for _, fileHeader := range files {
+			file, err := fileHeader.Open()
+			if err != nil {
+				continue
+			}
+			defer file.Close()
+			filename := filepath.Base(fileHeader.Filename)
+			dstPath := filepath.Join(ProductivityImgPath, filename)
+			dst, err := os.Create(dstPath)
+			if err != nil {
+				continue
+			}
+			defer dst.Close()
+			io.Copy(dst, file)
+		}
+	}
+
+	task := productivity.Task{
+		RobotESN:            targetRobot,
+		Phrases:             reminder.Phrases,
+		Image:               reminder.Image,
+		Source:              "test",
+		RequireConfirmation: reminder.RequireConfirmation,
+	}
+
+	productivity.InjectTestTask(task)
+	fmt.Fprint(w, "Test reminder queued.")
 }
 
 func handleSetKGAPI(w http.ResponseWriter, r *http.Request) {

@@ -38,6 +38,15 @@ func executorLoop() {
 	}
 }
 
+func InjectTestTask(task Task) {
+	logger.Println("Productivity: Injecting test task for " + task.RobotESN)
+	select {
+	case taskQueue <- task:
+	default:
+		logger.Println("Productivity: Task queue full, dropping test task")
+	}
+}
+
 func retryTask(task Task, reason string) {
 	if task.RetryCount >= 3 {
 		logger.Println(fmt.Sprintf("Productivity: Task for %s failed after 3 attempts (%s). Dropping.", task.RobotESN, reason))
