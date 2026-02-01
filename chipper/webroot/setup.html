@@ -209,11 +209,33 @@
               <option value="" selected>None</option>
               <option value="google_calendar">Google Calendar</option>
               <option value="todoist">Todoist</option>
+              <option value="nextcloud">Nextcloud (CalDAV)</option>
+              <option value="manual">Manual / Native Script</option>
             </select><br />
+
             <span id="productivityKeySpan" style="display: none">
                <label for="prodApiKey">API Key:</label><br />
                <input class="tinput" type="text" name="prodApiKey" id="prodApiKey" /><br />
             </span>
+
+            <span id="nextcloudInput" style="display: none">
+               <label for="ncUrl">Nextcloud Instance URL:</label><br />
+               <input class="tinput" type="text" name="ncUrl" id="ncUrl" placeholder="https://cloud.example.com" /><br />
+               <label for="ncUser">Username:</label><br />
+               <input class="tinput" type="text" name="ncUser" id="ncUser" /><br />
+               <label for="ncPass">App Password / Token:</label><br />
+               <input class="tinput" type="password" name="ncPass" id="ncPass" /><br />
+            </span>
+
+            <span id="manualInput" style="display: none; text-align: left;">
+               <div id="manualRemindersContainer">
+                 <!-- Reminders will be injected here via JS -->
+               </div>
+               <button type="button" onclick="addReminderBlock()" style="margin-top: 10px; width: 100%; padding: 10px; background-color: #4CAF50;">
+                 <i class="fa-solid fa-plus"></i> Add Reminder
+               </button>
+            </span>
+
           </form>
           <hr class="small-hr">
           <button onclick="sendProductivityAPIKey()">
@@ -282,7 +304,7 @@
 <script>
   updateWeatherAPI();
   updateKGAPI();
-  // Ensure I add updateProductivityAPI() here later once defined in js/main.js
+  updateProductivityAPI();
 </script>
 
 </html>
