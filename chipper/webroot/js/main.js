@@ -3,7 +3,7 @@ const intentsJson = JSON.parse(
 );
 
 var GetLog = false;
-let reminderCounter = 0;
+let reminderCounter = 0; 
 
 const getE = (element) => document.getElementById(element);
 
@@ -381,7 +381,6 @@ function addReminderBlock(data = null) {
     <label>Schedule Type:</label>
     <select class="reminder-schedule-type" onchange="toggleScheduleType('${id}', this.value)">
       <option value="daily" ${scheduleType === 'daily' ? 'selected' : ''}>Daily (Specific Time)</option>
-      <option value="weekly" ${scheduleType === 'weekly' ? 'selected' : ''}>Weekly (Specific Days)</option>
       <option value="hourly" ${scheduleType === 'hourly' ? 'selected' : ''}>Hourly</option>
       <option value="random_interval" ${scheduleType === 'random_interval' ? 'selected' : ''}>Random Interval</option>
     </select>
@@ -441,16 +440,10 @@ function toggleScheduleType(reminderId, type, existingData = null) {
       <label>Time (HH:MM):</label>
       <input type="time" class="tinput sched-daily-time" value="${timeVal}">
     `;
-  } else if (type === "weekly") {
-    const timeVal = existingData ? existingData.time : "08:00";
-    container.innerHTML = `
-      ${getDaysCheckboxHTML(existingDays)}
-      <label>Time (HH:MM):</label>
-      <input type="time" class="tinput sched-weekly-time" value="${timeVal}">
-    `;
   } else if (type === "hourly") {
      const minVal = existingData ? existingData.minute : "0";
      container.innerHTML = `
+       ${getDaysCheckboxHTML(existingDays)}
        <label>Minute past the hour (0-59):</label>
        <input type="number" min="0" max="59" class="tinput sched-hourly-minute" value="${minVal}" style="width: 80px;">
      `;
@@ -505,8 +498,6 @@ function collectManualConfigData(formDataObj) {
 
     if (schedType === "daily") {
         schedule.time = block.querySelector(".sched-daily-time").value;
-    } else if (schedType === "weekly") {
-        schedule.time = block.querySelector(".sched-weekly-time").value;
     } else if (schedType === "hourly") {
         schedule.minute = parseInt(block.querySelector(".sched-hourly-minute").value) || 0;
     } else {
