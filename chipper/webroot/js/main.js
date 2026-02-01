@@ -339,8 +339,11 @@ function addReminderBlock(data = null) {
     <label>ID / Name:</label>
     <input type="text" class="tinput reminder-id-val" value="${reminderName}" placeholder="e.g. meds_morning"><br>
 
-    <label>Image Filename:</label>
-    <input type="text" class="tinput reminder-img-val" value="${reminderImage}" placeholder="e.g. pill_icon.png"><br>
+    <!-- File Input for Image -->
+    <label>Image:</label><br>
+    <input type="hidden" class="reminder-img-existing" value="${reminderImage}">
+    ${reminderImage ? `<small style="color:gray;">Current: ${reminderImage}</small><br>` : ''}
+    <input type="file" class="reminder-file-input" accept="image/png" style="margin-top:5px; margin-bottom:10px;"><br>
 
     <label>Phrases:</label>
     <div class="phrases-container" id="${id}_phrases"></div>
@@ -401,16 +404,23 @@ function toggleScheduleType(reminderId, type, existingData = null) {
   }
 }
 
-function getManualConfigFromUI() {
+function collectManualConfigData(formDataObj) {
   const enabled = getE("enableManualReminders").checked;
-  if (!enabled) return "";
+  if (!enabled) return [];
 
   const blocks = document.querySelectorAll("#manualRemindersContainer .reminder-block");
   const config = [];
 
-  blocks.forEach(block => {
+  blocks.forEach((block, index) => {
     const id = block.querySelector(".reminder-id-val").value;
-    const image = block.querySelector(".reminder-img-val").value;
+    const existingImage = block.querySelector(".reminder-img-existing").value;
+    const fileInput = block.querySelector(".reminder-file-input");
+
+    let imageName = existingImage;
+    if (fileInput.files.length > 0) {
+        imageName = fileInput.files[0].name;
+        formDataObj.append("files", fileInput.files[0]);
+    }
 
     const phrases = [];
     block.querySelectorAll(".phrase-val").forEach(input => {
@@ -430,47 +440,46 @@ function getManualConfigFromUI() {
     if (id) {
         config.push({
             id: id,
-            image: image,
+            image: imageName,
             phrases: phrases,
             schedule: schedule
         });
     }
   });
 
-  return JSON.stringify(config);
+  return config;
 }
 
 function sendProductivityAPIKey() {
   const provider = getE("productivityProvider").value;
-  const data = {
-    provider: provider,
-    key: "",
-    url: "",
-    username: "",
-    password: "",
-    manual_config: getManualConfigFromUI()
-  };
+  
+  const formData = new FormData();
+
+  formData.append("provider", provider);
 
   if (provider === "google_calendar" || provider === "todoist") {
-    data.key = getE("prodApiKey").value;
+    formData.append("key", getE("prodApiKey").value);
   } else if (provider === "nextcloud") {
-    data.url = getE("ncUrl").value;
-    data.username = getE("ncUser").value;
-    data.password = getE("ncPass").value;
+    formData.append("url", getE("ncUrl").value);
+    formData.append("username", getE("ncUser").value);
+    formData.append("password", getE("ncPass").value);
   }
+  
+  const manualConfigArray = collectManualConfigData(formData);
+  formData.append("manual_config", JSON.stringify(manualConfigArray));
 
   displayMessage("addProductivityProviderAPIStatus", "Saving...");
 
   fetch("/api/set_productivity_api", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(data),
+    body: formData
   })
     .then((response) => response.text())
     .then((response) => {
       displayMessage("addProductivityProviderAPIStatus", response);
+    })
+    .catch((error) => {
+      displayMessage("addProductivityProviderAPIStatus", "Error saving settings: " + error);
     });
 }
 

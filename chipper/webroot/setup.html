@@ -203,7 +203,7 @@
           <p>Select the productivity provider you'd like to use.</p>
           <hr class="small-hr">
           <div id="addProductivityProviderAPI"></div>
-          <form id="productivityAPIAddForm">
+          <form id="productivityAPIAddForm" enctype="multipart/form-data">
             <label for="productivityProvider">Productivity API Provider:</label>
             <select name="productivityProvider" id="productivityProvider" form="productivityAPIAddForm" onchange="checkProductivity()">
               <option value="" selected>None</option>
@@ -260,7 +260,6 @@
         <div id="addProductivityProviderAPIStatus"></div>
         <hr />
       </div>
-
       <div id="section-restart" style="display: none">
         <h3>Restart Wire-Pod</h3>
         <div>
