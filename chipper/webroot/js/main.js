@@ -3,7 +3,7 @@ const intentsJson = JSON.parse(
 );
 
 var GetLog = false;
-let reminderCounter = 0;
+let reminderCounter = 0; 
 
 const getE = (element) => document.getElementById(element);
 
@@ -276,75 +276,31 @@ function populateRobotList() {
 }
 
 function checkProductivity() {
-  const provider = getE("productivityProvider").value;
-
-  getE("productivityKeySpan").style.display = "none";
-  getE("nextcloudInput").style.display = "none";
-
-  if (provider === "google_calendar") {
-    getE("productivityKeySpan").style.display = "block";
-    getE("prodKeyLabel").innerHTML = "Credentials (JSON) / OAuth Token:";
-    getE("prodApiKey").placeholder = "{ \"type\": \"service_account\", ... }";
-  } else if (provider === "todoist") {
-    getE("productivityKeySpan").style.display = "block";
-    getE("prodKeyLabel").innerHTML = "API Token:";
-    getE("prodApiKey").placeholder = "0123456789abcdef...";
-  } else if (provider === "nextcloud") {
-    getE("nextcloudInput").style.display = "block";
-  }
-}
-
-function startNextcloudAuth() {
-  const url = getE("ncUrl").value;
-  if (!url) {
-    alert("Please enter your Nextcloud Instance URL first.");
-    return;
-  }
-
-  const statusEl = getE("ncAuthStatus");
-  statusEl.innerHTML = "Initiating Login Flow...";
-
-  fetch(url.replace(/\/$/, "") + "/index.php/login/v2", {
-      method: "POST",
-  })
-  .then(res => res.json())
-  .then(data => {
-      if (data.login && data.poll) {
-          statusEl.innerHTML = `Please <a href="${data.login}" target="_blank" style="color:cyan; text-decoration:underline;">Click Here to Login</a> then return.`;
-          pollNextcloudAuth(data.poll.token, data.poll.endpoint);
-      } else {
-          statusEl.innerHTML = "Error: Invalid response from Nextcloud.";
-      }
-  })
-  .catch(err => {
-      console.error(err);
-      statusEl.innerHTML = "Error contacting Nextcloud. Check console/CORS.";
-  });
-}
-
-function pollNextcloudAuth(token, endpoint) {
-   const statusEl = getE("ncAuthStatus");
-   const interval = setInterval(() => {
-       fetch(endpoint + "?token=" + token, {
-           method: "POST"
-       })
-       .then(res => res.json())
-       .then(data => {
-           if (data.loginName && data.appPassword) {
-               clearInterval(interval);
-               getE("ncUser").value = data.loginName;
-               getE("ncPass").value = data.appPassword;
-               statusEl.innerHTML = "Success! Credentials captured.";
-           }
-       })
-       .catch(err => {
-       });
-   }, 2000);
+  const isTodoist = getE("todoistEnable").checked;
+  getE("productivityKeySpan").style.display = isTodoist ? "block" : "none";
 }
 
 function toggleManualReminders() {
    const enabled = getE("enableManualReminders").checked;
    getE("manualRemindersWrapper").style.display = enabled ? "block" : "none";
+   getE("manualAddBtn").style.display = enabled ? "block" : "none";
+}
+
+function toggleAccordion(id) {
+    const content = document.getElementById(id + "_content");
+    const header = document.getElementById(id + "_header");
+    
+    if (content.classList.contains("show")) {
+        content.classList.remove("show");
+        header.classList.remove("active");
+    } else {
+        content.classList.add("show");
+        header.classList.add("active");
+    }
+}
+
+function updateReminderTitle(id, value) {
+    document.getElementById(id + "_title").innerText = value || "New Reminder";
 }
 
 function addReminderBlock(data = null) {
@@ -357,43 +313,74 @@ function addReminderBlock(data = null) {
   block.id = id;
 
   const reminderName = data ? data.id : "reminder" + Math.random().toString(36).substring(2, 10);
+  const displayTitle = data ? data.id : "New Reminder";
   const reminderImage = data ? data.image : "";
   const scheduleType = data && data.schedule ? data.schedule.type : "daily";
   const requireConfirm = data && data.require_confirmation === true ? "checked" : "";
+  const isEnabled = data && data.enabled === false ? "" : "checked";
 
   block.innerHTML = `
-    <div class="reminder-header">
-      <h4 style="margin:0;">Reminder #${reminderCounter}</h4>
-      <div>
-        <button type="button" class="test-btn" onclick="testReminder('${id}')" style="background:#2196F3; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;">Test</button>
-        <button type="button" class="remove-btn" onclick="document.getElementById('${id}').remove()">Remove</button>
-      </div>
+    <div class="accordion-header" id="${id}_header" onclick="toggleAccordion('${id}')">
+      <span id="${id}_title">${displayTitle}</span>
+      <i class="fa-solid fa-chevron-down" style="float:right;"></i>
     </div>
+    
+    <div class="accordion-content" id="${id}_content">
+        <div class="reminder-grid">
+            <div class="reminder-section-divider">Identification & State</div>
+            
+            <label for="${id}_enabled">Status</label>
+            <div style="display:flex; align-items:center;">
+                <input type="checkbox" class="reminder-enabled" id="${id}_enabled" ${isEnabled}>
+                <label for="${id}_enabled" class="checkbox-label" style="font-weight:bold; color:var(--fg-color); margin-left:10px;">Enabled</label>
+            </div>
 
-    <input type="hidden" class="reminder-id-val" value="${reminderName}">
+            <label>ID / Name</label>
+            <input type="text" class="tinput reminder-id-val" value="${reminderName}" oninput="updateReminderTitle('${id}', this.value)" placeholder="e.g. meds_morning">
 
-    <div style="margin-bottom:10px;">
-       <input type="checkbox" class="reminder-req-confirm" id="${id}_confirm" ${requireConfirm}>
-       <label for="${id}_confirm" class="checkbox-label">Requires verbal confirmation ("Yes")?</label>
-    </div>
+            <div class="reminder-section-divider">Behaviour</div>
 
-    <label>Image:</label><br>
-    <input type="hidden" class="reminder-img-existing" value="${reminderImage}">
-    ${reminderImage ? `<small style="color:gray;">Current: ${reminderImage}</small><br>` : ''}
-    <input type="file" class="reminder-file-input" accept="image/png" style="margin-top:5px; margin-bottom:10px;"><br>
+            <label>Confirmation</label>
+            <div style="display:flex; align-items:center;">
+                <input type="checkbox" class="reminder-req-confirm" id="${id}_confirm" ${requireConfirm}>
+                <label for="${id}_confirm" class="checkbox-label" style="margin-left:10px;">Requires verbal "Yes"</label>
+            </div>
 
-    <label>Phrases:</label>
-    <div class="phrases-container" id="${id}_phrases"></div>
-    <button type="button" class="add-btn-small" onclick="addPhraseInput('${id}_phrases')">+ Add Phrase</button><br><br>
+            <label>Image</label>
+            <div>
+                <input type="hidden" class="reminder-img-existing" value="${reminderImage}">
+                ${reminderImage ? `
+                    <div style="margin-bottom: 8px; display: flex; align-items: center; gap: 15px;">
+                        <img src="/api/productivity-images/${reminderImage}" style="max-width: 80px; border: 1px solid #555; border-radius: 4px;">
+                        <small style="color:gray;">Current: ${reminderImage}</small>
+                    </div>
+                ` : ''}
+                <input type="file" class="reminder-file-input" accept="image/png">
+            </div>
 
-    <label>Schedule Type:</label>
-    <select class="reminder-schedule-type" onchange="toggleScheduleType('${id}', this.value)">
-      <option value="daily" ${scheduleType === 'daily' ? 'selected' : ''}>Daily (Specific Time)</option>
-      <option value="hourly" ${scheduleType === 'hourly' ? 'selected' : ''}>Hourly</option>
-      <option value="random_interval" ${scheduleType === 'random_interval' ? 'selected' : ''}>Random Interval</option>
-    </select>
+            <label>Phrases</label>
+            <div>
+                <div class="phrases-container" id="${id}_phrases"></div>
+                <button type="button" class="btn-generic" style="margin-top:10px;" onclick="addPhraseInput('${id}_phrases')">+ Add Phrase</button>
+            </div>
 
-    <div class="schedule-options" id="${id}_schedule_options">
+            <div class="reminder-section-divider">Scheduling</div>
+
+            <label>Repeat Type</label>
+            <select class="reminder-schedule-type" onchange="toggleScheduleType('${id}', this.value)">
+              <option value="daily" ${scheduleType === 'daily' ? 'selected' : ''}>Daily (Specific Time)</option>
+              <option value="hourly" ${scheduleType === 'hourly' ? 'selected' : ''}>Hourly</option>
+              <option value="random_interval" ${scheduleType === 'random_interval' ? 'selected' : ''}>Random Interval</option>
+            </select>
+
+            <div class="reminder-full-width" id="${id}_schedule_options">
+            </div>
+        </div>
+
+        <div class="reminder-actions" style="margin-top: 25px; border-top: 1px solid #444; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn-generic btn-test" onclick="testReminder('${id}')">Test on Vector</button>
+            <button type="button" class="btn-generic btn-remove" onclick="document.getElementById('${id}').remove()">Remove Reminder</button>
+        </div>
     </div>
   `;
 
@@ -466,26 +453,10 @@ function addPhraseInput(containerId, value = "") {
   const div = document.createElement("div");
   div.className = "phrase-row";
   div.innerHTML = `
-    <input type="text" class="tinput phrase-val" value="${value}" style="width: 80%;" placeholder="Spoken phrase...">
-    <button type="button" class="remove-btn" style="background:#666;" onclick="this.parentElement.remove()">X</button>
+    <input type="text" class="tinput phrase-val" value="${value}" style="flex: 1;" placeholder="Spoken phrase...">
+    <button type="button" class="btn-generic btn-remove" style="min-width: 40px;" onclick="this.parentElement.remove()">X</button>
   `;
   container.appendChild(div);
-}
-
-function getDaysCheckboxHTML(existingDays = []) {
-    const isChecked = (day) => existingDays.includes(day) ? "checked" : "";
-    return `
-      <label>Run only on specific days (Optional):</label><br>
-      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-bottom: 10px;">
-         <label><input type="checkbox" class="sched-day-check" value="Mon" ${isChecked('Mon')}> Mon</label>
-         <label><input type="checkbox" class="sched-day-check" value="Tue" ${isChecked('Tue')}> Tue</label>
-         <label><input type="checkbox" class="sched-day-check" value="Wed" ${isChecked('Wed')}> Wed</label>
-         <label><input type="checkbox" class="sched-day-check" value="Thu" ${isChecked('Thu')}> Thu</label>
-         <label><input type="checkbox" class="sched-day-check" value="Fri" ${isChecked('Fri')}> Fri</label>
-         <label><input type="checkbox" class="sched-day-check" value="Sat" ${isChecked('Sat')}> Sat</label>
-         <label><input type="checkbox" class="sched-day-check" value="Sun" ${isChecked('Sun')}> Sun</label>
-      </div>
-    `;
 }
 
 function toggleScheduleType(reminderId, type, existingData = null) {
@@ -493,36 +464,75 @@ function toggleScheduleType(reminderId, type, existingData = null) {
   container.innerHTML = "";
   
   const existingDays = existingData && existingData.days ? existingData.days : [];
+  const existingHours = existingData && existingData.hours ? existingData.hours : [];
 
   if (type === "daily") {
     const timeVal = existingData ? existingData.time : "08:00";
     container.innerHTML = `
-      ${getDaysCheckboxHTML(existingDays)}
-      <label>Time (HH:MM):</label>
-      <input type="time" class="tinput sched-daily-time" value="${timeVal}">
+      <div class="reminder-grid">
+        ${getDaysCheckboxHTML(existingDays)}
+        <label>Time (HH:MM)</label>
+        <input type="time" class="tinput sched-daily-time" value="${timeVal}">
+      </div>
     `;
   } else if (type === "hourly") {
      const minVal = existingData ? existingData.minute : "0";
      container.innerHTML = `
-       ${getDaysCheckboxHTML(existingDays)}
-       <label>Minute past the hour (0-59):</label>
-       <input type="number" min="0" max="59" class="tinput sched-hourly-minute" value="${minVal}" style="width: 80px;">
+       <div class="reminder-grid">
+         ${getDaysCheckboxHTML(existingDays)}
+         ${getHoursCheckboxHTML(existingHours)}
+         <label>Minute past hour</label>
+         <input type="number" min="0" max="59" class="tinput sched-hourly-minute" value="${minVal}">
+       </div>
      `;
   } else if (type === "random_interval") {
     const minVal = existingData ? existingData.min_minutes : "60";
     const maxVal = existingData ? existingData.max_minutes : "120";
     container.innerHTML = `
-      ${getDaysCheckboxHTML(existingDays)}
-      <div>
-        <label>Min Minutes:</label>
-        <input type="number" class="tinput sched-rnd-min" value="${minVal}" style="width: 80px;">
-      </div>
-      <div>
-        <label>Max Minutes:</label>
-        <input type="number" class="tinput sched-rnd-max" value="${maxVal}" style="width: 80px;">
+      <div class="reminder-grid">
+        ${getDaysCheckboxHTML(existingDays)}
+        ${getHoursCheckboxHTML(existingHours)}
+        <label>Min Minutes</label>
+        <input type="number" class="tinput sched-rnd-min" value="${minVal}">
+        <label>Max Minutes</label>
+        <input type="number" class="tinput sched-rnd-max" value="${maxVal}">
       </div>
     `;
   }
+}
+
+function getDaysCheckboxHTML(existingDays = []) {
+    const isChecked = (day) => existingDays.includes(day) ? "checked" : "";
+    return `
+      <label>Active Days</label>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Mon" ${isChecked('Mon')}> Mon</label>
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Tue" ${isChecked('Tue')}> Tue</label>
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Wed" ${isChecked('Wed')}> Wed</label>
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Thu" ${isChecked('Thu')}> Thu</label>
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Fri" ${isChecked('Fri')}> Fri</label>
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Sat" ${isChecked('Sat')}> Sat</label>
+         <label style="color:white; font-size:0.8em;"><input type="checkbox" class="sched-day-check" value="Sun" ${isChecked('Sun')}> Sun</label>
+      </div>
+    `;
+}
+
+function getHoursCheckboxHTML(existingHours = []) {
+    let html = `
+      <label>Active Hours<br><small>(Optional)</small></label>
+      <div class="hour-grid">
+    `;
+    for (let i = 0; i < 24; i++) {
+        const isChecked = existingHours.includes(i) ? "checked" : "";
+        html += `
+          <div class="hour-item">
+            <span class="hour-label">${i}h</span>
+            <input type="checkbox" class="sched-hour-check" value="${i}" ${isChecked} style="width:18px; height:18px;">
+          </div>
+        `;
+    }
+    html += `</div>`;
+    return html;
 }
 
 function collectManualConfigData(formDataObj) {
@@ -534,6 +544,7 @@ function collectManualConfigData(formDataObj) {
 
   blocks.forEach((block, index) => {
     const id = block.querySelector(".reminder-id-val").value;
+    const isEnabled = block.querySelector(".reminder-enabled").checked;
     const existingImage = block.querySelector(".reminder-img-existing").value;
     const fileInput = block.querySelector(".reminder-file-input");
     const requireConfirm = block.querySelector(".reminder-req-confirm").checked;
@@ -558,6 +569,12 @@ function collectManualConfigData(formDataObj) {
         schedule.days = days;
     }
 
+    const hours = [];
+    block.querySelectorAll(".sched-hour-check:checked").forEach(chk => hours.push(parseInt(chk.value)));
+    if (hours.length > 0) {
+        schedule.hours = hours;
+    }
+
     if (schedType === "daily") {
         schedule.time = block.querySelector(".sched-daily-time").value;
     } else if (schedType === "hourly") {
@@ -570,6 +587,7 @@ function collectManualConfigData(formDataObj) {
     if (id) {
         config.push({
             id: id,
+            enabled: isEnabled,
             image: imageName,
             phrases: phrases,
             require_confirmation: requireConfirm,
@@ -582,21 +600,14 @@ function collectManualConfigData(formDataObj) {
 }
 
 function sendProductivityAPIKey() {
-  const provider = getE("productivityProvider").value;
+  const isTodoist = getE("todoistEnable").checked;
+  const provider = isTodoist ? "todoist" : "none";
   
   const formData = new FormData();
-
   formData.append("provider", provider);
   formData.append("target_robot", getE("targetBot").value);
-
-  if (provider === "google_calendar" || provider === "todoist") {
-    formData.append("key", getE("prodApiKey").value);
-  } else if (provider === "nextcloud") {
-    formData.append("url", getE("ncUrl").value);
-    formData.append("username", getE("ncUser").value);
-    formData.append("password", getE("ncPass").value);
-  }
-
+  formData.append("key", getE("prodApiKey").value);
+  
   const manualConfigArray = collectManualConfigData(formData);
   formData.append("manual_config", JSON.stringify(manualConfigArray));
 
@@ -621,11 +632,8 @@ function updateProductivityAPI() {
         .then((response) => response.json())
         .then((data) => {
           if (data) {
-              getE("productivityProvider").value = data.provider;
+              getE("todoistEnable").checked = (data.provider === "todoist");
               getE("prodApiKey").value = data.key || "";
-              getE("ncUrl").value = data.url || "";
-              getE("ncUser").value = data.username || "";
-              getE("ncPass").value = data.password || "";
               
               if (data.target_robot) {
                   getE("targetBot").value = data.target_robot;

@@ -2,22 +2,21 @@ package productivity
 
 import (
 	"context"
-	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"google.golang.org/protobuf/encoding/protojson"
-
 	"github.com/fforchino/vector-go-sdk/pkg/vector"
 	"github.com/fforchino/vector-go-sdk/pkg/vectorpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
 	"github.com/kercre123/wire-pod/chipper/pkg/vars"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Task struct {
@@ -34,36 +33,37 @@ var (
 )
 
 func executorLoop() {
+	logger.Println("Productivity: executorLoop started")
 	for task := range taskQueue {
+		logger.Println("Productivity: Processing task for " + task.RobotESN)
 		processTask(task)
 		time.Sleep(5 * time.Second)
 	}
 }
 
 func InjectTestTask(task Task) {
-	logger.Println("Productivity: Injecting test task for " + task.RobotESN)
 	select {
 	case taskQueue <- task:
+		logger.Println("Productivity: Test task pushed")
 	default:
-		logger.Println("Productivity: Task queue full, dropping test task")
+		logger.Println("Productivity: Queue full")
 	}
 }
 
 func retryTask(task Task, reason string) {
-	if task.RetryCount >= 3 {
-		logger.Println(fmt.Sprintf("Productivity: Task for %s failed after 3 attempts (%s). Dropping.", task.RobotESN, reason))
+	if task.RetryCount >= 4 {
+		logger.Println("Productivity: Task failed permanently: " + reason)
 		return
 	}
 	task.RetryCount++
-	logger.Println(fmt.Sprintf("Productivity: Task failed (%s). Retrying in 30 seconds (Attempt %d/3)", reason, task.RetryCount))
+	backoff := math.Pow(2, float64(task.RetryCount))
 	go func() {
-		time.Sleep(30 * time.Second)
+		time.Sleep(time.Duration(backoff) * time.Second)
 		taskQueue <- task
 	}()
 }
 
 func snoozeTask(task Task) {
-	logger.Println("Productivity: No confirmation received. Snoozing reminder for 10 minutes.")
 	go func() {
 		time.Sleep(10 * time.Minute)
 		task.RetryCount = 0
@@ -74,131 +74,126 @@ func snoozeTask(task Task) {
 func processTask(task Task) {
 	robot, err := vars.GetRobot(task.RobotESN)
 	if err != nil {
-		retryTask(task, "Robot config lookup failed: "+err.Error())
+		retryTask(task, "Robot lookup failed")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 80*time.Second)
 	defer cancel()
 
-	_, err = robot.Conn.BatteryState(ctx, &vectorpb.BatteryStateRequest{})
+	bcClient, err := robot.Conn.BehaviorControl(ctx)
 	if err != nil {
-		retryTask(task, "Robot unreachable/offline: "+err.Error())
+		retryTask(task, "BC stream failed")
 		return
 	}
 
-	bcClient, err := robot.Conn.AssumeBehaviorControl(ctx, &vectorpb.BehaviorControlRequest{
+	req := &vectorpb.BehaviorControlRequest{
 		RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 			ControlRequest: &vectorpb.ControlRequest{
 				Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
 			},
 		},
-	})
-	if err != nil {
-		retryTask(task, "AssumeBehaviorControl failed: "+err.Error())
+	}
+
+	if err := bcClient.Send(req); err != nil {
+		retryTask(task, "Send BC request failed")
 		return
 	}
 
-	_, err = bcClient.Recv()
-	if err != nil {
-		retryTask(task, "Control not granted: "+err.Error())
-		return
-	}
-
-	var actionErr error
-
-	if len(task.Phrases) > 0 {
-		phrase := task.Phrases[rand.Intn(len(task.Phrases))]
-		if phrase != "" {
-			_, err := robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-				Text:           phrase,
-				UseVectorVoice: true,
-				DurationScalar: 1.0,
-			})
-			if err != nil {
-				logger.Println("Productivity: Error saying text: " + err.Error())
-				actionErr = err
-			}
+	granted := false
+	for {
+		resp, err := bcClient.Recv()
+		if err != nil {
+			retryTask(task, "BC recv failed")
+			return
 		}
+		if resp.GetControlGrantedResponse() != nil {
+			granted = true
+			break
+		}
+	}
+
+	if !granted {
+		return
+	}
+
+	defer func() {
+		releaseReq := &vectorpb.BehaviorControlRequest{
+			RequestType: &vectorpb.BehaviorControlRequest_ControlRelease{
+				ControlRelease: &vectorpb.ControlRelease{},
+			},
+		}
+		bcClient.Send(releaseReq)
+	}()
+
+	battResp, err := robot.Conn.BatteryState(ctx, &vectorpb.BatteryStateRequest{})
+	if err == nil && battResp.IsOnChargerPlatform {
+		_, err := robot.Conn.DriveOffCharger(ctx, &vectorpb.DriveOffChargerRequest{})
+		if err != nil {
+			retryTask(task, "Drive off failed")
+			return
+		}
+		time.Sleep(5 * time.Second)
 	}
 
 	if task.Image != "" {
 		fullPath := filepath.Join(ProductivityImgPath, task.Image)
 		if _, err := os.Stat(fullPath); err == nil {
-			logger.Println("Productivity: Processing image " + fullPath)
 			imgData, err := convertImageToVectorFace(fullPath)
 			if err == nil {
-				_, err = robot.Conn.DisplayFaceImageRGB(ctx, &vectorpb.DisplayFaceImageRGBRequest{
+				robot.Conn.DisplayFaceImageRGB(ctx, &vectorpb.DisplayFaceImageRGBRequest{
 					FaceData:         imgData,
-					DurationMs:       5000,
+					DurationMs:       30000,
 					InterruptRunning: true,
 				})
-				if err != nil {
-					logger.Println("Productivity: Error displaying image: " + err.Error())
-					if actionErr == nil {
-						actionErr = err
-					}
-				}
-			} else {
-				logger.Println("Productivity: Error converting image: " + err.Error())
 			}
 		}
 	}
 
-	if actionErr != nil {
-		retryTask(task, "Action execution failed: "+actionErr.Error())
-		return
+	if len(task.Phrases) > 0 {
+		phrase := task.Phrases[rand.Intn(len(task.Phrases))]
+		if phrase != "" {
+			robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+				Text:           phrase,
+				UseVectorVoice: true,
+				DurationScalar: 1.0,
+			})
+		}
 	}
 
 	if task.RequireConfirmation {
-		confirmed := waitForConfirmation(ctx, robot)
-		if !confirmed {
+		if !waitForConfirmation(ctx, robot) {
 			snoozeTask(task)
-		} else {
-			logger.Println("Productivity: Confirmation received. Reminder complete.")
-			robot.Conn.PlayAnimation(ctx, &vectorpb.PlayAnimationRequest{
-				Animation: &vectorpb.Animation{Name: "anim_feedback_shutup_01"},
-			})
 		}
 	}
 }
 
 func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
-	_, err := robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
+	robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
 		Intent: "intent_system_listen",
 	})
-	if err != nil {
-		logger.Println("Productivity: Failed to trigger listening mode: " + err.Error())
-		return false
-	}
 
 	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{})
 	if err != nil {
-		logger.Println("Productivity: Failed to start event stream: " + err.Error())
 		return false
 	}
 
-	timeoutChan := time.After(15 * time.Second)
-	responseChan := make(chan bool)
+	timeout := time.After(15 * time.Second)
+	response := make(chan bool)
 
 	go func() {
 		for {
 			msg, err := eventStream.Recv()
 			if err != nil {
-				close(responseChan)
 				return
 			}
 			if msg != nil && msg.Event != nil {
 				intent := msg.Event.GetUserIntent()
 				if intent != nil {
-					b, err := protojson.Marshal(intent)
-					if err != nil {
-						continue
-					}
+					b, _ := protojson.Marshal(intent)
 					s := string(b)
-					if strings.Contains(s, "intent_imperative_affirmative") ||
-						strings.Contains(s, "intent_global_yes") {
-						responseChan <- true
+					if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
+						response <- true
 						return
 					}
 				}
@@ -207,10 +202,9 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 	}()
 
 	select {
-	case result := <-responseChan:
+	case result := <-response:
 		return result
-	case <-timeoutChan:
-		logger.Println("Productivity: Timed out waiting for confirmation.")
+	case <-timeout:
 		return false
 	}
 }

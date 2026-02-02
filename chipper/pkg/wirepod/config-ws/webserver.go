@@ -276,8 +276,10 @@ func handleGetProductivityAPI(w http.ResponseWriter) {
 }
 
 func handleTestProductivityReminder(w http.ResponseWriter, r *http.Request) {
+	logger.Println("Received request for /api/test_productivity_reminder")
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
+		logger.Println("Error parsing test form data: " + err.Error())
 		http.Error(w, "Error parsing form data: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -291,18 +293,21 @@ func handleTestProductivityReminder(w http.ResponseWriter, r *http.Request) {
 	configStr := r.FormValue("reminder_config")
 	var reminder productivity.ManualReminder
 	if err := json.Unmarshal([]byte(configStr), &reminder); err != nil {
+		logger.Println("Error parsing reminder JSON: " + err.Error())
 		http.Error(w, "Invalid reminder config", http.StatusBadRequest)
 		return
 	}
 
 	files := r.MultipartForm.File["files"]
 	if len(files) > 0 {
+		logger.Println("Test Request contains image file(s)")
 		if _, err := os.Stat(ProductivityImgPath); os.IsNotExist(err) {
 			os.MkdirAll(ProductivityImgPath, 0755)
 		}
 		for _, fileHeader := range files {
 			file, err := fileHeader.Open()
 			if err != nil {
+				logger.Println("Error opening test image: " + err.Error())
 				continue
 			}
 			defer file.Close()
@@ -310,11 +315,15 @@ func handleTestProductivityReminder(w http.ResponseWriter, r *http.Request) {
 			dstPath := filepath.Join(ProductivityImgPath, filename)
 			dst, err := os.Create(dstPath)
 			if err != nil {
+				logger.Println("Error creating test image file: " + err.Error())
 				continue
 			}
 			defer dst.Close()
 			io.Copy(dst, file)
+			logger.Println("Saved test image: " + dstPath)
 		}
+	} else if reminder.Image != "" {
+		logger.Println("Test Request uses existing image: " + reminder.Image)
 	}
 
 	task := productivity.Task{
@@ -526,6 +535,8 @@ func StartWebServer() {
 	botsetup.RegisterBLEAPI()
 	http.HandleFunc("/api/", apiHandler)
 	http.HandleFunc("/session-certs/", certHandler)
+	http.Handle("/api/productivity-images/", http.StripPrefix("/api/productivity-images/", http.FileServer(http.Dir(ProductivityImgPath))))
+
 	var webRoot http.Handler
 	if runtime.GOOS == "darwin" && vars.Packaged {
 		appPath, _ := os.Executable()

@@ -2,7 +2,9 @@ package productivity
 
 import (
 	"encoding/json"
+	"io"
 	"math/rand"
+	"net/http"
 	"strings"
 	"time"
 
@@ -12,10 +14,12 @@ import (
 
 const (
 	ProductivityImgPath = "./productivity-images"
+	TodoistAPIEndpoint  = "https://api.todoist.com/rest/v2/tasks"
 )
 
 type ManualReminder struct {
 	ID                  string                 `json:"id"`
+	Enabled             bool                   `json:"enabled"`
 	Image               string                 `json:"image"`
 	Phrases             []string               `json:"phrases"`
 	RequireConfirmation bool                   `json:"require_confirmation"`
@@ -29,15 +33,29 @@ type ManualReminderSchedule struct {
 	MinMinutes int      `json:"min_minutes"`
 	MaxMinutes int      `json:"max_minutes"`
 	Days       []string `json:"days"`
+	Hours      []int    `json:"hours"`
+}
+
+type TodoistDue struct {
+	Datetime string `json:"datetime"`
+	Timezone string `json:"timezone"`
+}
+
+type TodoistTask struct {
+	ID      string      `json:"id"`
+	Content string      `json:"content"`
+	Due     *TodoistDue `json:"due"`
 }
 
 var (
-	nextRandomRun = make(map[string]time.Time)
-	schedulerQuit = make(chan bool)
+	nextRandomRun      = make(map[string]time.Time)
+	lastProcessedTasks = make(map[string]bool)
+	schedulerQuit      = make(chan bool)
+	externalApiClient  = &http.Client{Timeout: 15 * time.Second}
 )
 
 func StartScheduler() {
-	logger.Println("Starting Productivity Scheduler...")
+	logger.Println("Productivity: Starting Scheduler")
 	rand.Seed(time.Now().UnixNano())
 	go schedulerLoop()
 	go executorLoop()
@@ -48,18 +66,26 @@ func StopScheduler() {
 }
 
 func schedulerLoop() {
-	time.Sleep(10 * time.Second)
-	logger.Println("Productivity Scheduler is active.")
-	ticker := time.NewTicker(1 * time.Minute)
+	ticker := time.NewTicker(30 * time.Second)
+	externalApiTicker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
+	defer externalApiTicker.Stop()
+
 	for {
 		select {
 		case <-schedulerQuit:
 			return
+		case <-externalApiTicker.C:
+			provider := vars.APIConfig.Productivity.Provider
+			if provider == "todoist" {
+				checkTodoistTasks()
+			}
 		case <-ticker.C:
-			if !vars.APIConfig.Productivity.Enable {
+			configStr := vars.APIConfig.Productivity.ManualConfig
+			if configStr == "" || configStr == "[]" {
 				continue
 			}
+
 			targetBot := vars.APIConfig.Productivity.TargetRobot
 			if targetBot == "" || targetBot == "None" {
 				if len(vars.BotInfo.Robots) > 0 {
@@ -68,26 +94,89 @@ func schedulerLoop() {
 					continue
 				}
 			}
-			checkManualReminders(targetBot)
+			checkManualReminders(targetBot, configStr)
 		}
 	}
 }
 
-func checkManualReminders(esn string) {
-	configStr := vars.APIConfig.Productivity.ManualConfig
-	if configStr == "" || configStr == "[]" {
+func checkTodoistTasks() {
+	token := vars.APIConfig.Productivity.Key
+	if token == "" {
 		return
 	}
+
+	req, err := http.NewRequest("GET", TodoistAPIEndpoint, nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := externalApiClient.Do(req)
+	if err != nil {
+		logger.Println("Productivity: Todoist connection failed")
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var allTasks []TodoistTask
+	if err := json.Unmarshal(body, &allTasks); err != nil {
+		return
+	}
+
+	now := time.Now()
+	y, m, d := now.Date()
+	startOfNextDay := time.Date(y, m, d+1, 0, 0, 0, 0, now.Location())
+
+	targetBot := vars.APIConfig.Productivity.TargetRobot
+	if targetBot == "" || targetBot == "None" {
+		if len(vars.BotInfo.Robots) > 0 {
+			targetBot = vars.BotInfo.Robots[0].Esn
+		} else {
+			return
+		}
+	}
+
+	for _, task := range allTasks {
+		if task.Due == nil || task.Due.Datetime == "" {
+			continue
+		}
+
+		taskTime, err := time.Parse(time.RFC3339, task.Due.Datetime)
+		if err != nil {
+			continue
+		}
+
+		if taskTime.After(now) && taskTime.Before(startOfNextDay) {
+			if !lastProcessedTasks[task.ID] {
+				logger.Println("Productivity: Todoist task matched: " + task.Content)
+				taskQueue <- Task{
+					RobotESN: targetBot,
+					Phrases:  []string{task.Content},
+					Source:   "todoist",
+				}
+				lastProcessedTasks[task.ID] = true
+			}
+		}
+	}
+}
+
+func checkManualReminders(esn string, configStr string) {
 	var reminders []ManualReminder
 	if err := json.Unmarshal([]byte(configStr), &reminders); err != nil {
-		logger.Println("Productivity: Error parsing manual config: " + err.Error())
 		return
 	}
 	now := time.Now()
 	currentDay := now.Format("Mon")
 	currentHHMM := now.Format("15:04")
 	currentMinute := now.Minute()
+	currentHour := now.Hour()
+
 	for _, r := range reminders {
+		if !r.Enabled {
+			continue
+		}
+
 		if len(r.Schedule.Days) > 0 {
 			dayMatch := false
 			for _, d := range r.Schedule.Days {
@@ -100,6 +189,22 @@ func checkManualReminders(esn string) {
 				continue
 			}
 		}
+
+		if r.Schedule.Type == "hourly" || r.Schedule.Type == "random_interval" {
+			if len(r.Schedule.Hours) > 0 {
+				hourMatch := false
+				for _, h := range r.Schedule.Hours {
+					if h == currentHour {
+						hourMatch = true
+						break
+					}
+				}
+				if !hourMatch {
+					continue
+				}
+			}
+		}
+
 		shouldRun := false
 		switch r.Schedule.Type {
 		case "daily":
@@ -113,8 +218,8 @@ func checkManualReminders(esn string) {
 		case "random_interval":
 			shouldRun = handleRandomInterval(r.ID, r.Schedule.MinMinutes, r.Schedule.MaxMinutes)
 		}
+
 		if shouldRun {
-			logger.Println("Productivity: Scheduling task " + r.ID)
 			select {
 			case taskQueue <- Task{
 				RobotESN:            esn,
@@ -123,6 +228,7 @@ func checkManualReminders(esn string) {
 				Source:              "manual",
 				RequireConfirmation: r.RequireConfirmation,
 			}:
+				logger.Println("Productivity: Scheduled manual task " + r.ID)
 			default:
 				logger.Println("Productivity: Queue full, skipping task " + r.ID)
 			}
