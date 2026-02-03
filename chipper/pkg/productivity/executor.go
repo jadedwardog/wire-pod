@@ -186,13 +186,13 @@ func processTask(task Task) {
 	}
 
 	if task.RequireConfirmation {
-		if !waitForConfirmation(ctx, robot, bcClient) {
+		if !waitForConfirmation(ctx, robot, bcClient, task.RobotESN) {
 			snoozeTask(task)
 		}
 	}
 }
 
-func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vectorpb.BehaviorControl_ControlClient) bool {
+func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vectorpb.ExternalInterface_BehaviorControlClient, esn string) bool {
 	releaseReq := &vectorpb.BehaviorControlRequest{
 		RequestType: &vectorpb.BehaviorControlRequest_ControlRelease{
 			ControlRelease: &vectorpb.ControlRelease{},
@@ -216,14 +216,22 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 	robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
 		Intent: "intent_system_listen",
 	})
-	target := robot.Target
-	if strings.Contains(target, ":") {
-		ip := strings.Split(target, ":")[0]
+	var ip string
+	for _, bot := range vars.BotInfo.Robots {
+		if bot.Esn == esn {
+			ip = bot.IPAddress
+			break
+		}
+	}
+
+	if ip != "" {
 		go func() {
 			url := fmt.Sprintf("http://%s:8889/consolevarset?key=FakeButtonPressType&value=singlePressDetected", ip)
 			client := &http.Client{Timeout: 2 * time.Second}
 			_, _ = client.Get(url)
 		}()
+	} else {
+		logger.Println("Productivity: Could not find IP for ESN " + esn + " to force wake word.")
 	}
 
 	timeout := time.After(15 * time.Second)
