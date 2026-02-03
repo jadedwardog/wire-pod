@@ -327,6 +327,7 @@ func handleTestProductivityReminder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task := productivity.Task{
+		ID:                  reminder.ID,
 		RobotESN:            targetRobot,
 		Phrases:             reminder.Phrases,
 		Image:               reminder.Image,

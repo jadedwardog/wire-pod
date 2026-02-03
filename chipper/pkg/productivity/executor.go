@@ -79,10 +79,18 @@ func snoozeTask(task Task) {
 }
 
 func processTask(task Task) {
-	if task.Source == "manual" && task.ID != "" {
-		if !isReminderEnabled(task.ID) {
-			logger.Println("Productivity: Reminder " + task.ID + " is no longer enabled or exists. Stopping loop.")
-			return
+	if task.ID != "" {
+		exists, enabled := getReminderState(task.ID)
+		if task.Source == "manual" {
+			if !exists || !enabled {
+				logger.Println("Productivity: Reminder " + task.ID + " is no longer enabled or exists. Stopping loop.")
+				return
+			}
+		} else if task.Source == "test" {
+			if exists && !enabled {
+				logger.Println("Productivity: Test Reminder " + task.ID + " was explicitly disabled in config. Stopping loop.")
+				return
+			}
 		}
 	}
 

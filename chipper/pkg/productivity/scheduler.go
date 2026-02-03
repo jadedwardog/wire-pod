@@ -267,20 +267,20 @@ func calculateNextRandomTime(min int, max int) time.Time {
 	return time.Now().Add(time.Duration(interval) * time.Minute)
 }
 
-func isReminderEnabled(id string) bool {
+func getReminderState(id string) (bool, bool) {
 	configStr := vars.APIConfig.Productivity.ManualConfig
 	if configStr == "" || configStr == "[]" {
-		return false
+		return false, false
 	}
 	var reminders []ManualReminder
 	if err := json.Unmarshal([]byte(configStr), &reminders); err != nil {
 		logger.Println("Productivity: Error unmarshalling config for check: " + err.Error())
-		return false
+		return false, false
 	}
 	for _, r := range reminders {
 		if r.ID == id {
-			return r.Enabled
+			return true, r.Enabled
 		}
 	}
-	return false
+	return false, false
 }
