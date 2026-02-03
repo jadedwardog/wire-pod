@@ -18,7 +18,6 @@ import (
 	"github.com/fforchino/vector-go-sdk/pkg/vectorpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
 	"github.com/kercre123/wire-pod/chipper/pkg/vars"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Task struct {
@@ -165,11 +164,13 @@ func processTask(task Task) {
 		if _, err := os.Stat(fullPath); err == nil {
 			imgData, err := convertImageToVectorFace(fullPath)
 			if err == nil {
-				robot.Conn.DisplayFaceImageRGB(ctx, &vectorpb.DisplayFaceImageRGBRequest{
-					FaceData:         imgData,
-					DurationMs:       30000,
-					InterruptRunning: true,
-				})
+				go func() {
+					robot.Conn.DisplayFaceImageRGB(ctx, &vectorpb.DisplayFaceImageRGBRequest{
+						FaceData:         imgData,
+						DurationMs:       30000,
+						InterruptRunning: true,
+					})
+				}()
 			}
 		}
 	}
@@ -193,6 +194,7 @@ func processTask(task Task) {
 }
 
 func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vectorpb.ExternalInterface_BehaviorControlClient, esn string) bool {
+	// 1. Release Behavior Control so robot can listen
 	releaseReq := &vectorpb.BehaviorControlRequest{
 		RequestType: &vectorpb.BehaviorControlRequest_ControlRelease{
 			ControlRelease: &vectorpb.ControlRelease{},
@@ -201,21 +203,10 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 	if err := bcClient.Send(releaseReq); err != nil {
 		logger.Println("Productivity: Failed to release BC for confirmation: " + err.Error())
 	}
+	// Small delay to ensure BC is released before we trigger wake word
 	time.Sleep(500 * time.Millisecond)
-	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{
-		ListType: &vectorpb.EventRequest_WhiteList{
-			WhiteList: &vectorpb.FilterList{
-				List: []string{"user_intent"},
-			},
-		},
-	})
-	if err != nil {
-		logger.Println("Productivity: Failed to start event stream: " + err.Error())
-		return false
-	}
-	robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
-		Intent: "intent_system_listen",
-	})
+
+	// 2. Trigger Listening via Console Variable (most reliable method)
 	var ip string
 	for _, bot := range vars.BotInfo.Robots {
 		if bot.Esn == esn {
@@ -228,56 +219,100 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 		go func() {
 			url := fmt.Sprintf("http://%s:8889/consolevarset?key=FakeButtonPressType&value=singlePressDetected", ip)
 			client := &http.Client{Timeout: 2 * time.Second}
-			_, _ = client.Get(url)
+			client.Get(url)
 		}()
 	} else {
 		logger.Println("Productivity: Could not find IP for ESN " + esn + " to force wake word.")
 	}
 
-	timeout := time.After(15 * time.Second)
-	response := make(chan bool)
+	// 3. Watch Logs for Intent
+	logger.Println("Productivity: Waiting for confirmation response in logs...")
+	timeout := time.After(30 * time.Second)
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 
-	go func() {
-		for {
-			msg, err := eventStream.Recv()
-			if err != nil {
-				return
+	// Capture the current length of the log to ignore old history
+	startLogLen := len(logger.LogList)
+
+	for {
+		select {
+		case <-ticker.C:
+			currentLog := logger.LogList
+			// Handle log rotation or clearing
+			if len(currentLog) < startLogLen {
+				startLogLen = 0
 			}
-			if msg != nil && msg.Event != nil {
-				intent := msg.Event.GetUserIntent()
-				if intent != nil {
-					b, _ := protojson.Marshal(intent)
-					s := string(b)
-					logger.Println("Productivity: Heard intent: " + s)
-					if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
-						robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-							Text:           "Great!",
-							UseVectorVoice: true,
-							DurationScalar: 1.0,
-						})
-						response <- true
-						return
-					}
-					if strings.Contains(s, "intent_imperative_negative") {
-						robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-							Text:           "Ok, I'll remind you again soon.",
-							UseVectorVoice: true,
-							DurationScalar: 1.0,
-						})
-						response <- false
-						return
-					}
+
+			// Check new log entries
+			if len(currentLog) > startLogLen {
+				newLogs := currentLog[startLogLen:]
+
+				// Broad checks for intent strings to catch them regardless of formatting
+				if strings.Contains(newLogs, "intent_imperative_affirmative") || strings.Contains(newLogs, "intent_global_yes") {
+					logger.Println("Productivity: Affirmative received from logs. Speaking response.")
+					bcClient.Send(&vectorpb.BehaviorControlRequest{
+						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+							ControlRequest: &vectorpb.ControlRequest{
+								Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+							},
+						},
+					})
+					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+						Text:           "Great!",
+						UseVectorVoice: true,
+						DurationScalar: 1.0,
+					})
+					return true
+				}
+				if strings.Contains(newLogs, "intent_imperative_negative") {
+					logger.Println("Productivity: Negative received from logs. Speaking response.")
+					bcClient.Send(&vectorpb.BehaviorControlRequest{
+						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+							ControlRequest: &vectorpb.ControlRequest{
+								Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+							},
+						},
+					})
+					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+						Text:           "Ok, I'll remind you again soon.",
+						UseVectorVoice: true,
+						DurationScalar: 1.0,
+					})
+					return false
+				}
+				if strings.Contains(newLogs, "intent_system_noaudio") {
+					logger.Println("Productivity: No audio received from logs. Speaking response.")
+					bcClient.Send(&vectorpb.BehaviorControlRequest{
+						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+							ControlRequest: &vectorpb.ControlRequest{
+								Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+							},
+						},
+					})
+					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+						Text:           "I didn't hear anything. I'll remind you later.",
+						UseVectorVoice: true,
+						DurationScalar: 1.0,
+					})
+					return false
 				}
 			}
+		case <-timeout:
+			logger.Println("Productivity: Confirmation timed out")
+			bcClient.Send(&vectorpb.BehaviorControlRequest{
+				RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+					ControlRequest: &vectorpb.ControlRequest{
+						Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+					},
+				},
+			})
+			robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+				Text:           "I didn't hear anything. I'll remind you later.",
+				UseVectorVoice: true,
+				DurationScalar: 1.0,
+			})
+			return false
 		}
-	}()
-
-	select {
-	case result := <-response:
-		return result
-	case <-timeout:
-		logger.Println("Productivity: Confirmation timed out")
-		return false
 	}
 }
 
