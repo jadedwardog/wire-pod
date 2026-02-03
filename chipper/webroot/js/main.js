@@ -553,6 +553,8 @@ function collectManualConfigData(formDataObj) {
     const existingImage = block.querySelector(".reminder-img-existing").value;
     const fileInput = block.querySelector(".reminder-file-input");
     const requireConfirm = block.querySelector(".reminder-req-confirm").checked;
+    const snoozeInput = block.querySelector(".reminder-snooze-val");
+    const snoozeMinutes = snoozeInput ? parseInt(snoozeInput.value) : 10;
 
     let imageName = existingImage;
     if (fileInput.files.length > 0) {
