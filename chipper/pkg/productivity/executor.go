@@ -191,12 +191,22 @@ func processTask(task Task) {
 }
 
 func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
-	robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
+	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{
+		ListType: &vectorpb.EventRequest_WhiteList{
+			WhiteList: &vectorpb.FilterList{
+				List: []string{"user_intent"},
+			},
+		},
+	})
+	if err != nil {
+		logger.Println("Productivity: Failed to start event stream: " + err.Error())
+		return false
+	}
+	_, err = robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
 		Intent: "intent_system_listen",
 	})
-
-	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{})
 	if err != nil {
+		logger.Println("Productivity: Failed to trigger listen: " + err.Error())
 		return false
 	}
 
@@ -214,6 +224,7 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 				if intent != nil {
 					b, _ := protojson.Marshal(intent)
 					s := string(b)
+					logger.Println("Productivity: Heard intent: " + s)
 					if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
 						response <- true
 						return
@@ -227,6 +238,7 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 	case result := <-response:
 		return result
 	case <-timeout:
+		logger.Println("Productivity: Confirmation timed out")
 		return false
 	}
 }
