@@ -26,6 +26,7 @@ type Task struct {
 	Source              string
 	RetryCount          int
 	RequireConfirmation bool
+	SnoozeMinutes       int
 }
 
 var (
@@ -64,8 +65,12 @@ func retryTask(task Task, reason string) {
 }
 
 func snoozeTask(task Task) {
+	duration := task.SnoozeMinutes
+	if duration <= 0 {
+		duration = 10
+	}
 	go func() {
-		time.Sleep(10 * time.Minute)
+		time.Sleep(time.Duration(duration) * time.Minute)
 		task.RetryCount = 0
 		taskQueue <- task
 	}()

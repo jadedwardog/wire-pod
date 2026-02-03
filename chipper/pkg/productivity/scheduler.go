@@ -23,6 +23,7 @@ type ManualReminder struct {
 	Image               string                 `json:"image"`
 	Phrases             []string               `json:"phrases"`
 	RequireConfirmation bool                   `json:"require_confirmation"`
+	SnoozeMinutes       int                    `json:"snooze_minutes"`
 	Schedule            ManualReminderSchedule `json:"schedule"`
 }
 
@@ -227,6 +228,7 @@ func checkManualReminders(esn string, configStr string) {
 				Image:               r.Image,
 				Source:              "manual",
 				RequireConfirmation: r.RequireConfirmation,
+				SnoozeMinutes:       r.SnoozeMinutes,
 			}:
 				logger.Println("Productivity: Scheduled manual task " + r.ID)
 			default:
