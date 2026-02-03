@@ -2,11 +2,13 @@ package productivity
 
 import (
 	"context"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
 	"math"
 	"math/rand"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,13 +186,22 @@ func processTask(task Task) {
 	}
 
 	if task.RequireConfirmation {
-		if !waitForConfirmation(ctx, robot) {
+		if !waitForConfirmation(ctx, robot, bcClient) {
 			snoozeTask(task)
 		}
 	}
 }
 
-func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
+func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vectorpb.BehaviorControl_ControlClient) bool {
+	releaseReq := &vectorpb.BehaviorControlRequest{
+		RequestType: &vectorpb.BehaviorControlRequest_ControlRelease{
+			ControlRelease: &vectorpb.ControlRelease{},
+		},
+	}
+	if err := bcClient.Send(releaseReq); err != nil {
+		logger.Println("Productivity: Failed to release BC for confirmation: " + err.Error())
+	}
+	time.Sleep(500 * time.Millisecond)
 	eventStream, err := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{
 		ListType: &vectorpb.EventRequest_WhiteList{
 			WhiteList: &vectorpb.FilterList{
@@ -202,12 +213,17 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 		logger.Println("Productivity: Failed to start event stream: " + err.Error())
 		return false
 	}
-	_, err = robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
+	robot.Conn.AppIntent(ctx, &vectorpb.AppIntentRequest{
 		Intent: "intent_system_listen",
 	})
-	if err != nil {
-		logger.Println("Productivity: Failed to trigger listen: " + err.Error())
-		return false
+	target := robot.Target
+	if strings.Contains(target, ":") {
+		ip := strings.Split(target, ":")[0]
+		go func() {
+			url := fmt.Sprintf("http://%s:8889/consolevarset?key=FakeButtonPressType&value=singlePressDetected", ip)
+			client := &http.Client{Timeout: 2 * time.Second}
+			_, _ = client.Get(url)
+		}()
 	}
 
 	timeout := time.After(15 * time.Second)
@@ -226,7 +242,21 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector) bool {
 					s := string(b)
 					logger.Println("Productivity: Heard intent: " + s)
 					if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
+						robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+							Text:           "Great!",
+							UseVectorVoice: true,
+							DurationScalar: 1.0,
+						})
 						response <- true
+						return
+					}
+					if strings.Contains(s, "intent_imperative_negative") {
+						robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+							Text:           "Ok, I'll remind you again soon.",
+							UseVectorVoice: true,
+							DurationScalar: 1.0,
+						})
+						response <- false
 						return
 					}
 				}
