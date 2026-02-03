@@ -20,6 +20,7 @@ import (
 )
 
 type Task struct {
+	ID                  string
 	RobotESN            string
 	Phrases             []string
 	Image               string
@@ -65,18 +66,26 @@ func retryTask(task Task, reason string) {
 }
 
 func snoozeTask(task Task) {
-	duration := task.SnoozeMinutes
-	if duration <= 0 {
-		duration = 10
+	duration := 10 * time.Minute
+	if task.SnoozeMinutes > 0 {
+		duration = time.Duration(task.SnoozeMinutes) * time.Minute
 	}
+	logger.Println("Productivity: Snoozing task " + task.ID + " for " + duration.String())
 	go func() {
-		time.Sleep(time.Duration(duration) * time.Minute)
+		time.Sleep(duration)
 		task.RetryCount = 0
 		taskQueue <- task
 	}()
 }
 
 func processTask(task Task) {
+	if task.Source == "manual" && task.ID != "" {
+		if !isReminderEnabled(task.ID) {
+			logger.Println("Productivity: Reminder " + task.ID + " is no longer enabled or exists. Stopping loop.")
+			return
+		}
+	}
+
 	robot, err := vars.GetRobot(task.RobotESN)
 	if err != nil {
 		retryTask(task, "Robot lookup failed")

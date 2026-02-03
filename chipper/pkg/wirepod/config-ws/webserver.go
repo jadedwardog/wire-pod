@@ -332,6 +332,7 @@ func handleTestProductivityReminder(w http.ResponseWriter, r *http.Request) {
 		Image:               reminder.Image,
 		Source:              "test",
 		RequireConfirmation: reminder.RequireConfirmation,
+		SnoozeMinutes:       reminder.SnoozeMinutes,
 	}
 
 	productivity.InjectTestTask(task)

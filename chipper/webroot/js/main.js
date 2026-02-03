@@ -318,7 +318,7 @@ function addReminderBlock(data = null) {
   const scheduleType = data && data.schedule ? data.schedule.type : "daily";
   const requireConfirm = data && data.require_confirmation === true ? "checked" : "";
   const isEnabled = data && data.enabled === false ? "" : "checked";
-  const snoozeValue = data && data.snooze_minutes ? data.snooze_minutes : 10;
+  const snoozeVal = data && data.snooze_minutes ? data.snooze_minutes : 10;
 
   block.innerHTML = `
     <div class="accordion-header" id="${id}_header" onclick="toggleAccordion('${id}')">
@@ -344,12 +344,11 @@ function addReminderBlock(data = null) {
             <label>Confirmation</label>
             <div style="display:flex; align-items:center;">
                 <input type="checkbox" class="reminder-req-confirm" id="${id}_confirm" ${requireConfirm}>
-                <label for="${id}_confirm" class="checkbox-label" style="margin-left:10px;">Requires verbal "Yes"</label>
+                <label for="${id}_confirm" class="checkbox-label" style="margin-left:10px;">Requires verbal "Yes" (otherwise snooze)</label>
             </div>
-            <div style="display:flex; align-items:center;">
-              <label for="${id}_snooze">Snooze Duration (minutes):</label>
-              <input type="number" class="tinput reminder-snooze-val" id="${id}_snooze" value="${snoozeValue}" min="1" max="1440" style="width: 80px;">
-            </div>
+
+            <label>Snooze Time (Minutes)</label>
+            <input type="number" class="tinput reminder-snooze-val" value="${snoozeVal}" min="1" placeholder="10">
 
             <label>Image</label>
             <div>
@@ -413,6 +412,7 @@ function testReminder(id) {
   const existingImage = block.querySelector(".reminder-img-existing").value;
   const fileInput = block.querySelector(".reminder-file-input");
   const requireConfirm = block.querySelector(".reminder-req-confirm").checked;
+  const snoozeMinutes = parseInt(block.querySelector(".reminder-snooze-val").value) || 10;
 
   const formData = new FormData();
   formData.append("target_robot", targetBot);
@@ -433,6 +433,7 @@ function testReminder(id) {
       image: imageName,
       phrases: phrases,
       require_confirmation: requireConfirm,
+      snooze_minutes: snoozeMinutes,
       schedule: { type: "test" } 
   };
 
@@ -553,8 +554,7 @@ function collectManualConfigData(formDataObj) {
     const existingImage = block.querySelector(".reminder-img-existing").value;
     const fileInput = block.querySelector(".reminder-file-input");
     const requireConfirm = block.querySelector(".reminder-req-confirm").checked;
-    const snoozeInput = block.querySelector(".reminder-snooze-val");
-    const snoozeMinutes = snoozeInput ? parseInt(snoozeInput.value) : 10;
+    const snoozeMinutes = parseInt(block.querySelector(".reminder-snooze-val").value) || 10;
 
     let imageName = existingImage;
     if (fileInput.files.length > 0) {

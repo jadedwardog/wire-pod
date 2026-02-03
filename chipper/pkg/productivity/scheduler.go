@@ -223,6 +223,7 @@ func checkManualReminders(esn string, configStr string) {
 		if shouldRun {
 			select {
 			case taskQueue <- Task{
+				ID:                  r.ID,
 				RobotESN:            esn,
 				Phrases:             r.Phrases,
 				Image:               r.Image,
@@ -264,4 +265,22 @@ func calculateNextRandomTime(min int, max int) time.Time {
 		interval = min + rand.Intn(max-min)
 	}
 	return time.Now().Add(time.Duration(interval) * time.Minute)
+}
+
+func isReminderEnabled(id string) bool {
+	configStr := vars.APIConfig.Productivity.ManualConfig
+	if configStr == "" || configStr == "[]" {
+		return false
+	}
+	var reminders []ManualReminder
+	if err := json.Unmarshal([]byte(configStr), &reminders); err != nil {
+		logger.Println("Productivity: Error unmarshalling config for check: " + err.Error())
+		return false
+	}
+	for _, r := range reminders {
+		if r.ID == id {
+			return r.Enabled
+		}
+	}
+	return false
 }
