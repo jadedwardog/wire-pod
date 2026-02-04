@@ -19,6 +19,7 @@ import (
 	"github.com/fforchino/vector-go-sdk/pkg/vectorpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
 	"github.com/kercre123/wire-pod/chipper/pkg/vars"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type Task struct {
@@ -203,7 +204,7 @@ func processTask(task Task) {
 	}
 
 	if task.RequireConfirmation {
-		logger.Println("Productivity: Waiting for confirmation response in logs...")
+		logger.Println("Productivity: Waiting for confirmation response...")
 		if waitForConfirmation(ctx, robot, bcClient, task.RobotESN) {
 		} else {
 			snoozeTask(task)
@@ -236,29 +237,57 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 			client := &http.Client{Timeout: 2 * time.Second}
 			client.Get(url)
 		}()
-	} else {
-		logger.Println("Productivity: Could not find IP for ESN " + esn + " to force wake word.")
 	}
 
+	eventStream, _ := robot.Conn.EventStream(ctx, &vectorpb.EventRequest{})
 	timeout := time.After(30 * time.Second)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-
 	startLogLen := len(logger.LogList)
 
 	for {
 		select {
 		case <-ticker.C:
-			currentLog := logger.LogList
-			if len(currentLog) < startLogLen {
-				startLogLen = 0
+			if eventStream != nil {
+				msg, err := eventStream.Recv()
+				if err == nil && msg != nil && msg.Event != nil {
+					intent := msg.Event.GetUserIntent()
+					if intent != nil {
+						b, _ := protojson.Marshal(intent)
+						s := string(b)
+						if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
+							logger.Println("Productivity: Affirmative matched via EventStream.")
+							bcClient.Send(&vectorpb.BehaviorControlRequest{
+								RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+									ControlRequest: &vectorpb.ControlRequest{
+										Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+									},
+								},
+							})
+							robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Great!", UseVectorVoice: true})
+							return true
+						}
+						if strings.Contains(s, "intent_imperative_negative") {
+							logger.Println("Productivity: Negative matched via EventStream.")
+							bcClient.Send(&vectorpb.BehaviorControlRequest{
+								RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+									ControlRequest: &vectorpb.ControlRequest{
+										Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+									},
+								},
+							})
+							robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Ok, I'll remind you again soon.", UseVectorVoice: true})
+							return false
+						}
+					}
+				}
 			}
 
+			currentLog := logger.LogList
 			if len(currentLog) > startLogLen {
 				newLogs := currentLog[startLogLen:]
-
 				if strings.Contains(newLogs, "intent_imperative_affirmative") || strings.Contains(newLogs, "intent_global_yes") {
-					logger.Println("Productivity: Affirmative received from logs. Speaking response.")
+					logger.Println("Productivity: Affirmative matched via Log Fallback.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
 						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 							ControlRequest: &vectorpb.ControlRequest{
@@ -266,15 +295,11 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 							},
 						},
 					})
-					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-						Text:           "Great!",
-						UseVectorVoice: true,
-						DurationScalar: 1.0,
-					})
+					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Great!", UseVectorVoice: true})
 					return true
 				}
 				if strings.Contains(newLogs, "intent_imperative_negative") {
-					logger.Println("Productivity: Negative received from logs. Speaking response.")
+					logger.Println("Productivity: Negative matched via Log Fallback.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
 						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 							ControlRequest: &vectorpb.ControlRequest{
@@ -282,15 +307,11 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 							},
 						},
 					})
-					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-						Text:           "Ok, I'll remind you again soon.",
-						UseVectorVoice: true,
-						DurationScalar: 1.0,
-					})
+					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Ok, I'll remind you again soon.", UseVectorVoice: true})
 					return false
 				}
 				if strings.Contains(newLogs, "intent_system_noaudio") {
-					logger.Println("Productivity: No audio received from logs. Speaking response.")
+					logger.Println("Productivity: No audio matched via Log Fallback.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
 						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 							ControlRequest: &vectorpb.ControlRequest{
@@ -298,16 +319,12 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 							},
 						},
 					})
-					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-						Text:           "I didn't hear anything. I'll remind you later.",
-						UseVectorVoice: true,
-						DurationScalar: 1.0,
-					})
+					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "I didn't hear anything. I'll remind you later.", UseVectorVoice: true})
 					return false
 				}
 			}
 		case <-timeout:
-			logger.Println("Productivity: Confirmation timed out")
+			logger.Println("Productivity: Confirmation timed out.")
 			bcClient.Send(&vectorpb.BehaviorControlRequest{
 				RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 					ControlRequest: &vectorpb.ControlRequest{
@@ -315,11 +332,7 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 					},
 				},
 			})
-			robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-				Text:           "I didn't hear anything. I'll remind you later.",
-				UseVectorVoice: true,
-				DurationScalar: 1.0,
-			})
+			robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "I didn't hear anything. I'll remind you later.", UseVectorVoice: true})
 			return false
 		}
 	}
