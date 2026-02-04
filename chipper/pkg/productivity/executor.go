@@ -1,6 +1,7 @@
 package productivity
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -11,14 +12,18 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	pb "github.com/digital-dream-labs/api/go/chipperpb"
 	"github.com/fforchino/vector-go-sdk/pkg/vector"
 	"github.com/fforchino/vector-go-sdk/pkg/vectorpb"
 	"github.com/kercre123/wire-pod/chipper/pkg/logger"
+	"github.com/kercre123/wire-pod/chipper/pkg/scripting"
 	"github.com/kercre123/wire-pod/chipper/pkg/vars"
+	"github.com/kercre123/wire-pod/chipper/pkg/vtt"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -31,6 +36,11 @@ type Task struct {
 	RetryCount          int
 	RequireConfirmation bool
 	SnoozeMinutes       int
+}
+
+type systemIntentResponseStruct struct {
+	Status       string `json:"status"`
+	ReturnIntent string `json:"returnIntent"`
 }
 
 var (
@@ -206,6 +216,7 @@ func processTask(task Task) {
 	if task.RequireConfirmation {
 		logger.Println("Productivity: Waiting for confirmation response...")
 		if waitForConfirmation(ctx, robot, bcClient, task.RobotESN) {
+			logger.Println("Productivity: Confirmation successful.")
 		} else {
 			snoozeTask(task)
 		}
@@ -256,7 +267,6 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 						b, _ := protojson.Marshal(intent)
 						s := string(b)
 						if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
-							logger.Println("Productivity: Affirmative matched via EventStream.")
 							bcClient.Send(&vectorpb.BehaviorControlRequest{
 								RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 									ControlRequest: &vectorpb.ControlRequest{
@@ -268,7 +278,6 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 							return true
 						}
 						if strings.Contains(s, "intent_imperative_negative") {
-							logger.Println("Productivity: Negative matched via EventStream.")
 							bcClient.Send(&vectorpb.BehaviorControlRequest{
 								RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 									ControlRequest: &vectorpb.ControlRequest{
@@ -287,7 +296,6 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 			if len(currentLog) > startLogLen {
 				newLogs := currentLog[startLogLen:]
 				if strings.Contains(newLogs, "intent_imperative_affirmative") || strings.Contains(newLogs, "intent_global_yes") {
-					logger.Println("Productivity: Affirmative matched via Log Fallback.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
 						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 							ControlRequest: &vectorpb.ControlRequest{
@@ -299,7 +307,6 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 					return true
 				}
 				if strings.Contains(newLogs, "intent_imperative_negative") {
-					logger.Println("Productivity: Negative matched via Log Fallback.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
 						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 							ControlRequest: &vectorpb.ControlRequest{
@@ -311,7 +318,6 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 					return false
 				}
 				if strings.Contains(newLogs, "intent_system_noaudio") {
-					logger.Println("Productivity: No audio matched via Log Fallback.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
 						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 							ControlRequest: &vectorpb.ControlRequest{
@@ -324,7 +330,6 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 				}
 			}
 		case <-timeout:
-			logger.Println("Productivity: Confirmation timed out.")
 			bcClient.Send(&vectorpb.BehaviorControlRequest{
 				RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
 					ControlRequest: &vectorpb.ControlRequest{
@@ -336,6 +341,183 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 			return false
 		}
 	}
+}
+
+func IntentPass(req interface{}, intentThing string, speechText string, intentParams map[string]string, isParam bool) (interface{}, error) {
+	var esn string
+	var req1 *vtt.IntentRequest
+	var req2 *vtt.IntentGraphRequest
+	var isIntentGraph bool
+
+	if str, ok := req.(*vtt.IntentRequest); ok {
+		req1 = str
+		esn = req1.Device
+		isIntentGraph = false
+	} else if str, ok := req.(*vtt.IntentGraphRequest); ok {
+		req2 = str
+		esn = req2.Device
+		isIntentGraph = true
+	}
+
+	if !isIntentGraph && vars.APIConfig.Knowledge.IntentGraph && intentThing == "intent_system_unmatched" {
+		intentThing = "intent_greeting_hello"
+	}
+
+	var intentResult pb.IntentResult
+	if isParam {
+		intentResult = pb.IntentResult{
+			QueryText:  speechText,
+			Action:     intentThing,
+			Parameters: intentParams,
+		}
+	} else {
+		intentResult = pb.IntentResult{
+			QueryText: speechText,
+			Action:    intentThing,
+		}
+	}
+
+	logger.LogUI("Intent matched: " + intentThing + ", transcribed text: '" + speechText + "', device: " + esn)
+
+	intent := pb.IntentResponse{
+		IsFinal:      true,
+		IntentResult: &intentResult,
+	}
+
+	intentGraphSend := pb.IntentGraphResponse{
+		ResponseType: pb.IntentGraphMode_INTENT,
+		IsFinal:      true,
+		IntentResult: &intentResult,
+		CommandType:  pb.RobotMode_VOICE_COMMAND.String(),
+	}
+
+	if !isIntentGraph {
+		if err := req1.Stream.Send(&intent); err != nil {
+			return nil, err
+		}
+		return &vtt.IntentResponse{Intent: &intent}, nil
+	} else {
+		if err := req2.Stream.Send(&intentGraphSend); err != nil {
+			return nil, err
+		}
+		return &vtt.IntentGraphResponse{Intent: &intentGraphSend}, nil
+	}
+}
+
+func CustomIntentHandler(req interface{}, voiceText string, botSerial string) bool {
+	if !vars.CustomIntentsExist {
+		return false
+	}
+
+	voiceText = strings.ToLower(voiceText)
+	for _, c := range vars.CustomIntents {
+		for _, v := range c.Utterances {
+			seekText := strings.ToLower(strings.TrimSpace(v))
+			if (c.IsSystemIntent && strings.HasPrefix(seekText, "*")) || strings.Contains(voiceText, seekText) {
+				logger.Println("Bot " + botSerial + " Custom Intent Matched: " + c.Name)
+				
+				var intentParams map[string]string
+				var isParam bool = false
+				if c.Params.ParamValue != "" {
+					intentParams = map[string]string{c.Params.ParamName: c.Params.ParamValue}
+					isParam = true
+				}
+
+				if c.LuaScript != "" {
+					go func() {
+						if err := scripting.RunLuaScript(botSerial, c.LuaScript); err != nil {
+							logger.Println("Error running Lua script: " + err.Error())
+						}
+					}()
+				}
+
+				var args []string
+				for _, arg := range c.ExecArgs {
+					switch arg {
+					case "!botSerial":
+						arg = botSerial
+					case "!speechText":
+						arg = "\"" + voiceText + "\""
+					case "!intentName":
+						arg = c.Name
+					case "!locale":
+						arg = vars.APIConfig.STT.Language
+					}
+					args = append(args, arg)
+				}
+
+				var customIntentExec *exec.Cmd
+				if len(args) == 0 {
+					customIntentExec = exec.Command(c.Exec)
+				} else {
+					customIntentExec = exec.Command(c.Exec, args...)
+				}
+
+				var out bytes.Buffer
+				var stderr bytes.Buffer
+				customIntentExec.Stdout = &out
+				customIntentExec.Stderr = &stderr
+				
+				if err := customIntentExec.Run(); err != nil {
+					logger.Println("Exec error: " + err.Error() + ": " + stderr.String())
+				}
+
+				if c.IsSystemIntent {
+					var resp systemIntentResponseStruct
+					if err := json.Unmarshal(out.Bytes(), &resp); err == nil && resp.Status == "ok" {
+						IntentPass(req, resp.ReturnIntent, voiceText, intentParams, isParam)
+						return true
+					}
+				} else {
+					IntentPass(req, c.Intent, voiceText, intentParams, isParam)
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func ProcessTextAll(req interface{}, voiceText string, intents []vars.JsonIntent, isOpus bool) bool {
+	var botSerial string
+	if str, ok := req.(*vtt.IntentRequest); ok {
+		botSerial = str.Device
+	} else if str, ok := req.(*vtt.KnowledgeGraphRequest); ok {
+		botSerial = str.Device
+	} else if str, ok := req.(*vtt.IntentGraphRequest); ok {
+		botSerial = str.Device
+	}
+
+	voiceText = strings.ToLower(voiceText)
+
+	if CustomIntentHandler(req, voiceText, botSerial) {
+		return true
+	}
+
+	for _, b := range intents {
+		for _, c := range b.Keyphrases {
+			if voiceText == strings.ToLower(c) {
+				logger.Println("Bot " + botSerial + " Perfect match for intent " + b.Name)
+				IntentPass(req, b.Name, voiceText, nil, false)
+				return true
+			}
+		}
+	}
+
+	for _, b := range intents {
+		if b.RequireExactMatch {
+			continue
+		}
+		for _, c := range b.Keyphrases {
+			if strings.Contains(voiceText, strings.ToLower(c)) {
+				logger.Println("Bot " + botSerial + " Partial match for intent " + b.Name)
+				IntentPass(req, b.Name, voiceText, nil, false)
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func convertImageToVectorFace(path string) ([]byte, error) {
