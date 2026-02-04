@@ -2,6 +2,7 @@ package productivity
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
@@ -51,6 +52,7 @@ type TodoistTask struct {
 var (
 	nextRandomRun      = make(map[string]time.Time)
 	lastProcessedTasks = make(map[string]bool)
+	lastManualRun      = make(map[string]string)
 	schedulerQuit      = make(chan bool)
 	externalApiClient  = &http.Client{Timeout: 15 * time.Second}
 )
@@ -152,6 +154,7 @@ func checkTodoistTasks() {
 			if !lastProcessedTasks[task.ID] {
 				logger.Println("Productivity: Todoist task matched: " + task.Content)
 				taskQueue <- Task{
+					ID:       task.ID,
 					RobotESN: targetBot,
 					Phrases:  []string{task.Content},
 					Source:   "todoist",
@@ -207,14 +210,21 @@ func checkManualReminders(esn string, configStr string) {
 		}
 
 		shouldRun := false
+		var runKey string
 		switch r.Schedule.Type {
 		case "daily":
 			if r.Schedule.Time == currentHHMM {
-				shouldRun = true
+				runKey = r.ID + "_" + now.Format("2006-01-02") + "_" + currentHHMM
+				if lastManualRun[r.ID] != runKey {
+					shouldRun = true
+				}
 			}
 		case "hourly":
 			if r.Schedule.Minute == currentMinute {
-				shouldRun = true
+				runKey = r.ID + "_" + now.Format("2006-01-02-15") + "_" + fmt.Sprint(currentMinute)
+				if lastManualRun[r.ID] != runKey {
+					shouldRun = true
+				}
 			}
 		case "random_interval":
 			shouldRun = handleRandomInterval(r.ID, r.Schedule.MinMinutes, r.Schedule.MaxMinutes)
@@ -232,6 +242,9 @@ func checkManualReminders(esn string, configStr string) {
 				SnoozeMinutes:       r.SnoozeMinutes,
 			}:
 				logger.Println("Productivity: Scheduled manual task " + r.ID)
+				if runKey != "" {
+					lastManualRun[r.ID] = runKey
+				}
 			default:
 				logger.Println("Productivity: Queue full, skipping task " + r.ID)
 			}
@@ -265,22 +278,4 @@ func calculateNextRandomTime(min int, max int) time.Time {
 		interval = min + rand.Intn(max-min)
 	}
 	return time.Now().Add(time.Duration(interval) * time.Minute)
-}
-
-func getReminderState(id string) (bool, bool) {
-	configStr := vars.APIConfig.Productivity.ManualConfig
-	if configStr == "" || configStr == "[]" {
-		return false, false
-	}
-	var reminders []ManualReminder
-	if err := json.Unmarshal([]byte(configStr), &reminders); err != nil {
-		logger.Println("Productivity: Error unmarshalling config for check: " + err.Error())
-		return false, false
-	}
-	for _, r := range reminders {
-		if r.ID == id {
-			return true, r.Enabled
-		}
-	}
-	return false, false
 }

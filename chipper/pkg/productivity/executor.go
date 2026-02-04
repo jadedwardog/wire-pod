@@ -2,6 +2,7 @@ package productivity
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -77,6 +78,23 @@ func snoozeTask(task Task) {
 		task.RetryCount = 0
 		taskQueue <- task
 	}()
+}
+
+func getReminderState(id string) (bool, bool) {
+	configStr := vars.APIConfig.Productivity.ManualConfig
+	if configStr == "" || configStr == "[]" {
+		return false, false
+	}
+	var reminders []ManualReminder
+	if err := json.Unmarshal([]byte(configStr), &reminders); err != nil {
+		return false, false
+	}
+	for _, r := range reminders {
+		if r.ID == id {
+			return true, r.Enabled
+		}
+	}
+	return false, false
 }
 
 func processTask(task Task) {
@@ -164,13 +182,11 @@ func processTask(task Task) {
 		if _, err := os.Stat(fullPath); err == nil {
 			imgData, err := convertImageToVectorFace(fullPath)
 			if err == nil {
-				go func() {
-					robot.Conn.DisplayFaceImageRGB(ctx, &vectorpb.DisplayFaceImageRGBRequest{
-						FaceData:         imgData,
-						DurationMs:       30000,
-						InterruptRunning: true,
-					})
-				}()
+				robot.Conn.DisplayFaceImageRGB(ctx, &vectorpb.DisplayFaceImageRGBRequest{
+					FaceData:         imgData,
+					DurationMs:       30000,
+					InterruptRunning: true,
+				})
 			}
 		}
 	}
@@ -187,14 +203,15 @@ func processTask(task Task) {
 	}
 
 	if task.RequireConfirmation {
-		if !waitForConfirmation(ctx, robot, bcClient, task.RobotESN) {
+		logger.Println("Productivity: Waiting for confirmation response in logs...")
+		if waitForConfirmation(ctx, robot, bcClient, task.RobotESN) {
+		} else {
 			snoozeTask(task)
 		}
 	}
 }
 
 func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vectorpb.ExternalInterface_BehaviorControlClient, esn string) bool {
-	// 1. Release Behavior Control so robot can listen
 	releaseReq := &vectorpb.BehaviorControlRequest{
 		RequestType: &vectorpb.BehaviorControlRequest_ControlRelease{
 			ControlRelease: &vectorpb.ControlRelease{},
@@ -203,10 +220,8 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 	if err := bcClient.Send(releaseReq); err != nil {
 		logger.Println("Productivity: Failed to release BC for confirmation: " + err.Error())
 	}
-	// Small delay to ensure BC is released before we trigger wake word
 	time.Sleep(500 * time.Millisecond)
 
-	// 2. Trigger Listening via Console Variable (most reliable method)
 	var ip string
 	for _, bot := range vars.BotInfo.Robots {
 		if bot.Esn == esn {
@@ -225,29 +240,23 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 		logger.Println("Productivity: Could not find IP for ESN " + esn + " to force wake word.")
 	}
 
-	// 3. Watch Logs for Intent
-	logger.Println("Productivity: Waiting for confirmation response in logs...")
 	timeout := time.After(30 * time.Second)
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
-	// Capture the current length of the log to ignore old history
 	startLogLen := len(logger.LogList)
 
 	for {
 		select {
 		case <-ticker.C:
 			currentLog := logger.LogList
-			// Handle log rotation or clearing
 			if len(currentLog) < startLogLen {
 				startLogLen = 0
 			}
 
-			// Check new log entries
 			if len(currentLog) > startLogLen {
 				newLogs := currentLog[startLogLen:]
 
-				// Broad checks for intent strings to catch them regardless of formatting
 				if strings.Contains(newLogs, "intent_imperative_affirmative") || strings.Contains(newLogs, "intent_global_yes") {
 					logger.Println("Productivity: Affirmative received from logs. Speaking response.")
 					bcClient.Send(&vectorpb.BehaviorControlRequest{
