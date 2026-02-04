@@ -91,6 +91,34 @@ func snoozeTask(task Task) {
 	}()
 }
 
+func sayText(ctx context.Context, robot *vector.Vector, text string) {
+	if text == "" {
+		return
+	}
+	bc, err := robot.Conn.BehaviorControl(ctx)
+	if err == nil {
+		bc.Send(&vectorpb.BehaviorControlRequest{
+			RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
+				ControlRequest: &vectorpb.ControlRequest{
+					Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
+				},
+			},
+		})
+		defer bc.Send(&vectorpb.BehaviorControlRequest{
+			RequestType: &vectorpb.BehaviorControlRequest_ControlRelease{
+				ControlRelease: &vectorpb.ControlRelease{},
+			},
+		})
+	}
+	logger.Println("Productivity: responding to user with " + text)
+	robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
+		Text:           text,
+		UseVectorVoice: true,
+		DurationScalar: 1.0,
+	})
+	time.Sleep(500 * time.Millisecond)
+}
+
 func getReminderState(id string) (bool, bool) {
 	configStr := vars.APIConfig.Productivity.ManualConfig
 	if configStr == "" || configStr == "[]" {
@@ -204,13 +232,7 @@ func processTask(task Task) {
 
 	if len(task.Phrases) > 0 {
 		phrase := task.Phrases[rand.Intn(len(task.Phrases))]
-		if phrase != "" {
-			robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{
-				Text:           phrase,
-				UseVectorVoice: true,
-				DurationScalar: 1.0,
-			})
-		}
+		sayText(ctx, robot, phrase)
 	}
 
 	if task.RequireConfirmation {
@@ -267,25 +289,11 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 						b, _ := protojson.Marshal(intent)
 						s := string(b)
 						if strings.Contains(s, "intent_imperative_affirmative") || strings.Contains(s, "intent_global_yes") {
-							bcClient.Send(&vectorpb.BehaviorControlRequest{
-								RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
-									ControlRequest: &vectorpb.ControlRequest{
-										Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
-									},
-								},
-							})
-							robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Great!", UseVectorVoice: true})
+							sayText(ctx, robot, "Great!")
 							return true
 						}
 						if strings.Contains(s, "intent_imperative_negative") {
-							bcClient.Send(&vectorpb.BehaviorControlRequest{
-								RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
-									ControlRequest: &vectorpb.ControlRequest{
-										Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
-									},
-								},
-							})
-							robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Ok, I'll remind you again soon.", UseVectorVoice: true})
+							sayText(ctx, robot, "Ok, I'll remind you again soon.")
 							return false
 						}
 					}
@@ -296,48 +304,20 @@ func waitForConfirmation(ctx context.Context, robot *vector.Vector, bcClient vec
 			if len(currentLog) > startLogLen {
 				newLogs := currentLog[startLogLen:]
 				if strings.Contains(newLogs, "intent_imperative_affirmative") || strings.Contains(newLogs, "intent_global_yes") {
-					bcClient.Send(&vectorpb.BehaviorControlRequest{
-						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
-							ControlRequest: &vectorpb.ControlRequest{
-								Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
-							},
-						},
-					})
-					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Great!", UseVectorVoice: true})
+					sayText(ctx, robot, "Great!")
 					return true
 				}
 				if strings.Contains(newLogs, "intent_imperative_negative") {
-					bcClient.Send(&vectorpb.BehaviorControlRequest{
-						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
-							ControlRequest: &vectorpb.ControlRequest{
-								Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
-							},
-						},
-					})
-					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "Ok, I'll remind you again soon.", UseVectorVoice: true})
+					sayText(ctx, robot, "Ok, I'll remind you again soon.")
 					return false
 				}
 				if strings.Contains(newLogs, "intent_system_noaudio") {
-					bcClient.Send(&vectorpb.BehaviorControlRequest{
-						RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
-							ControlRequest: &vectorpb.ControlRequest{
-								Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
-							},
-						},
-					})
-					robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "I didn't hear anything. I'll remind you later.", UseVectorVoice: true})
+					sayText(ctx, robot, "I didn't hear anything. I'll remind you later.")
 					return false
 				}
 			}
 		case <-timeout:
-			bcClient.Send(&vectorpb.BehaviorControlRequest{
-				RequestType: &vectorpb.BehaviorControlRequest_ControlRequest{
-					ControlRequest: &vectorpb.ControlRequest{
-						Priority: vectorpb.ControlRequest_OVERRIDE_BEHAVIORS,
-					},
-				},
-			})
-			robot.Conn.SayText(ctx, &vectorpb.SayTextRequest{Text: "I didn't hear anything. I'll remind you later.", UseVectorVoice: true})
+			sayText(ctx, robot, "I didn't hear anything. I'll remind you later.")
 			return false
 		}
 	}
