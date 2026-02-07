@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wire-Pod Dashboard</title>
+    <link rel="stylesheet" href="./css/xpod.css">
+</head>
+<body>
+    <script src="https://kit.fontawesome.com/7508f396ac.js" crossorigin="anonymous"></script>
+
+    <div id="retro-container">
+        <div class="bg-grid"></div>
+
+        <div id="eyes-container" title="Tap to annoy">
+            <div id="eye-left" class="eye"></div>
+            <div id="eye-right" class="eye"></div>
+        </div>
+
+        <div id="boot-screen">
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="boot-blob"></div>
+            </div>
+            <div class="boot-logo-container">
+                <h1 class="boot-title">
+                    <span style="color: #22c55e;">X</span>POD
+                </h1>
+                <p style="color: white; font-weight: bold; margin-top: 0.5rem; letter-spacing: 0.1em; font-size: 0.875rem;">WIREPOD</p>
+            </div>
+        </div>
+
+        <div class="main-layout">
+            
+            <div class="sidebar">
+                <div class="sidebar-content">
+                    <h2 id="screen-title" class="text-2xl font-bold uppercase" style="letter-spacing: 0.1em; opacity: 0.6;">DASHBOARD</h2>
+                    <div id="version-info" style="margin-top: 1rem; font-size: 0.75rem; font-family: monospace; opacity: 0.5;">
+                        C:Loading...<br/>A:Loading...
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                
+                <div id="screen-main" class="screen active perspective-container">
+                    <ul id="main-menu-list">
+                    </ul>
+                </div>
+
+                <div id="screen-server_settings" class="screen panel placeholder-body">
+                    <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; letter-spacing: 0.1em;">SERVER SETTINGS</h2>
+                    <div style="width: 6rem; height: 6rem; margin: 0 auto; border-radius: 50%; border: 4px solid #2b5c2b; display: flex; align-items: center; justify-content: center;" class="animate-pulse">
+                        <i class="fa-solid fa-gear text-4xl" style="color: #2b5c2b;"></i>
+                    </div>
+                    <p style="margin-top: 1.5rem; color: #4a8a4a; text-transform: uppercase; font-size: 0.875rem;">Awaiting Content</p>
+                    <button class="btn-back">Press BACK</button>
+                </div>
+
+                <div id="screen-bot_settings" class="screen panel placeholder-body">
+                    <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; letter-spacing: 0.1em;">BOT SETTINGS</h2>
+                    <div style="width: 6rem; height: 6rem; margin: 0 auto; border-radius: 50%; border: 4px solid #2b5c2b; display: flex; align-items: center; justify-content: center;" class="animate-pulse">
+                        <i class="fa-solid fa-briefcase text-4xl" style="color: #2b5c2b;"></i>
+                    </div>
+                    <p style="margin-top: 1.5rem; color: #4a8a4a; text-transform: uppercase; font-size: 0.875rem;">Awaiting Content</p>
+                    <button class="btn-back">Press BACK</button>
+                </div>
+
+                <div id="screen-bot_setup" class="screen panel placeholder-body">
+                    <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; letter-spacing: 0.1em;">BOT SETUP</h2>
+                    <div style="width: 6rem; height: 6rem; margin: 0 auto; border-radius: 50%; border: 4px solid #2b5c2b; display: flex; align-items: center; justify-content: center;" class="animate-pulse">
+                        <i class="fa-solid fa-robot text-4xl" style="color: #2b5c2b;"></i>
+                    </div>
+                    <p style="margin-top: 1.5rem; color: #4a8a4a; text-transform: uppercase; font-size: 0.875rem;">Awaiting Content</p>
+                    <button class="btn-back">Press BACK</button>
+                </div>
+
+                <div id="screen-custom_intents" class="screen panel placeholder-body">
+                    <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; letter-spacing: 0.1em;">CUSTOM INTENTS</h2>
+                    <div style="width: 6rem; height: 6rem; margin: 0 auto; border-radius: 50%; border: 4px solid #2b5c2b; display: flex; align-items: center; justify-content: center;" class="animate-pulse">
+                        <i class="fa-solid fa-microphone text-4xl" style="color: #2b5c2b;"></i>
+                    </div>
+                    <p style="margin-top: 1.5rem; color: #4a8a4a; text-transform: uppercase; font-size: 0.875rem;">Awaiting Content</p>
+                    <button class="btn-back">Press BACK</button>
+                </div>
+
+                <div id="screen-log" class="screen panel placeholder-body">
+                    <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; letter-spacing: 0.1em;">LOG</h2>
+                    <div style="width: 6rem; height: 6rem; margin: 0 auto; border-radius: 50%; border: 4px solid #2b5c2b; display: flex; align-items: center; justify-content: center;" class="animate-pulse">
+                        <i class="fa-solid fa-file-lines text-4xl" style="color: #2b5c2b;"></i>
+                    </div>
+                    <p style="margin-top: 1.5rem; color: #4a8a4a; text-transform: uppercase; font-size: 0.875rem;">Awaiting Content</p>
+                    <button class="btn-back">Press BACK</button>
+                </div>
+
+                <div id="screen-version_info" class="screen panel">
+                    <div class="info-panel-body" style="display: flex; flex-direction: column; height: 100%;">
+                        <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; border-bottom: 1px solid #2b5c2b; padding-bottom: 0.5rem; letter-spacing: 0.1em;">VERSION INFO</h2>
+                        <div class="info-content">
+                            <div class="animate-scroll-text absolute" style="top: 0; width: 100%;">
+                                <p>XPOD Interface for Wire-Pod</p><br/>
+                                <p>Wire-Pod is an open-source server enabling Vector robots to function independently.</p>
+                                <p>Freeing robots from the cloud since 2022.</p><br/>
+                                <p>This XPOD UI is a retro-styled dashboard paying homage to the 2001 console era.</p><br/>
+                                <p>Features: Local voice processing, custom intents, and nostalgic green aesthetics.</p><br/>
+                                <p id="scroll-k">C: ...</p>
+                                <p id="scroll-d">A: ...</p>
+                            </div>
+                        </div>
+                        <button class="btn-back">Press BACK</button>
+                    </div>
+                </div>
+
+                <div id="screen-ui_settings" class="screen panel placeholder-body">
+                    <h2 class="text-2xl font-bold uppercase" style="color: #39ff14; margin-bottom: 1rem; letter-spacing: 0.1em;">UI SETTINGS</h2>
+                    <div style="width: 6rem; height: 6rem; margin: 0 auto; border-radius: 50%; border: 4px solid #2b5c2b; display: flex; align-items: center; justify-content: center;" class="animate-pulse">
+                        <i class="fa-solid fa-pen-nib text-4xl" style="color: #2b5c2b;"></i>
+                    </div>
+                    <p style="margin-top: 1.5rem; color: #4a8a4a; text-transform: uppercase; font-size: 0.875rem;">Awaiting Content</p>
+                    <button class="btn-back">Press BACK</button>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="hud">
+            <div class="hud-item">
+                <div class="btn-icon btn-a">A</div> Select
+            </div>
+            <div class="hud-item">
+                <div class="btn-icon btn-b">B</div> Back
+            </div>
+        </div>
+    </div>
+
+    <script src="./js/xpod.js"></script>
+</body>
+</html>
