@@ -44,6 +44,7 @@ var (
 	WhisperModelPath  string = "../whisper.cpp/models/"
 	SessionCertPath   string = "./session-certs/"
 	VersionFile       string = "./version"
+	UIConfigPath      string = "./ui-config.json"
 )
 
 var (
@@ -78,6 +79,12 @@ var ChipperKey []byte
 var ChipperKeysLoaded bool
 
 var RecurringInfo []RecurringInfoStore
+
+var UIConfig UIConfigStruct
+
+type UIConfigStruct struct {
+	Theme string `json:"theme"`
+}
 
 type RememberedChat struct {
 	ESN   string                         `json:"esn"`
@@ -158,6 +165,21 @@ func join(p1, p2 string) string {
 	return filepath.Join(p1, p2)
 }
 
+func ReadUIConfig() {
+	if _, err := os.Stat(UIConfigPath); err == nil {
+		file, _ := os.ReadFile(UIConfigPath)
+		json.Unmarshal(file, &UIConfig)
+	}
+	if UIConfig.Theme == "" {
+		UIConfig.Theme = "classic"
+	}
+}
+
+func WriteUIConfig() {
+	writeBytes, _ := json.Marshal(UIConfig)
+	os.WriteFile(UIConfigPath, writeBytes, 0644)
+}
+
 func Init() {
 	logger.Println("Commit SHA: " + CommitSHA)
 	if VarsInited {
@@ -190,6 +212,7 @@ func Init() {
 		ServerConfigPath = join(podDir, "./certs/server_config.json")
 		Certs = join(podDir, "./certs")
 		SessionCertPath = join(podDir, SessionCertPath)
+		UIConfigPath = join(podDir, "ui-config.json")
 		if runtime.GOOS == "android" {
 			VersionFile = AndroidPath + "/static/version"
 		}
@@ -197,6 +220,8 @@ func Init() {
 		os.Mkdir(SessionCertPath, 0777)
 		os.Mkdir(Certs, 0777)
 	}
+
+	ReadUIConfig()
 
 	if os.Getenv("WEBSERVER_PORT") != "" {
 		if _, err := strconv.Atoi(os.Getenv("WEBSERVER_PORT")); err == nil {

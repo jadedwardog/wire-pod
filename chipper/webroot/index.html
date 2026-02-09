@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#1e1e1e">
+  <!-- Style.css linked, but classes removed from body elements per request -->
   <link rel="stylesheet" type="text/css" href="css/style.css" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <script src="https://kit.fontawesome.com/7508f396ac.js" crossorigin="anonymous"></script>
@@ -17,176 +18,176 @@
 
 <body>
   <div id="outer">
-    <div id="content" class="">
-      <h1>Wire-Pod</h1>
+    <div id="content">
+      <h1 id="main-title">Wire-Pod</h1>
       <!-- Bot stats, connected and battery -->
       <div id="botStats"></div>
-      <hr />
+      <hr id="hr-top" />
 
-      <div class="main-nav-parent">
+      <div id="nav-container">
         <!--WP settings-->
-        <div class="main-nav-child">
-          <a href="setup.html"><i class="fa-solid fa-gear"></i><br />Server Settings</a>
+        <div id="nav-item-server">
+          <a id="link-server-settings" href="setup.html"><i id="icon-server-settings" class="fa-solid fa-gear"></i><br />Server Settings</a>
         </div>
         <!--Bot Settings-->
-        <div class="main-nav-child">
-          <a href="/sdkapp"><i class="fa solid fa-toolbox"></i><br />Bot Settings</a>
+        <div id="nav-item-bot-settings">
+          <a id="link-bot-settings" href="/sdkapp"><i id="icon-bot-settings" class="fa solid fa-toolbox"></i><br />Bot Settings</a>
         </div>
         <!--Bot Setup-->
-        <div class="main-nav-child">
-          <a href="#" onclick="showBotAuth(); return false;"><i class="fa solid fa-robot" id="icon-BotAuth"
+        <div id="nav-item-bot-setup">
+          <a id="link-bot-setup" href="#" onclick="showBotAuth(); return false;"><i id="icon-BotAuth" class="fa solid fa-robot"
               name="icon"></i><br />Bot Setup</a>
         </div>
         <!--Custom Intents-->
-        <div class="main-nav-child">
-          <a href="#" onclick="showIntents(); return false;"><i class="fa-solid fa-microphone-lines" id="icon-Intents"
+        <div id="nav-item-custom-intents">
+          <a id="link-custom-intents" href="#" onclick="showIntents(); return false;"><i id="icon-Intents" class="fa-solid fa-microphone-lines"
               name="icon"></i><br />Custom Intents</a>
         </div>
         <!--Logs-->
-        <div class="main-nav-child">
-          <a href="#" onclick="showLog(); return false;"><i class="fa-solid fa-file-lines" id="icon-Logs"
+        <div id="nav-item-logs">
+          <a id="link-logs" href="#" onclick="showLog(); return false;"><i id="icon-Logs" class="fa-solid fa-file-lines"
               name="icon"></i><br />Log</a>
         </div>
         <!--Version-->
-        <div class="main-nav-child">
-          <a href="#" onclick="showVersion(); return false;"><i class="fa-solid fa-code-compare" id="icon-Version"
+        <div id="nav-item-version">
+          <a id="link-version" href="#" onclick="showVersion(); return false;"><i id="icon-Version" class="fa-solid fa-code-compare"
               name="icon"></i><br />Version Info</a>
         </div>
         <!--UI Customizer-->
-        <div class="main-nav-child">
-          <a href="#" onclick="showUICustomizer(); return false;"><i class="fa-solid fa-pen-nib" id="icon-Customizer"
+        <div id="nav-item-ui">
+          <a id="link-ui" href="#" onclick="showUICustomizer(); return false;"><i id="icon-Customizer" class="fa-solid fa-pen-nib"
               name="icon"></i><br />UI Settings</a>
         </div>
       </div>
-      <hr />
+      <hr id="hr-mid" />
 
       <div id="section-intents" style="display: none">
         <h2 id="foldable-add" onclick="toggleSection('content-add', 'content-edit')">
-          <span>+</span>
+          <span id="foldable-add-span">+</span>
           Add a custom intent
         </h2>
-        <div class="content" id="content-add">
-          <p>
+        <div id="content-add" style="display: none">
+          <p id="intent-wiki-p">
             For more details, see
-            <a href="https://github.com/kercre123/wire-pod/wiki/Custom-Intents" target="_blank">the Custom Intents page of the wiki</a>
+            <a id="link-intent-wiki" href="https://github.com/kercre123/wire-pod/wiki/Custom-Intents" target="_blank">the Custom Intents page of the wiki</a>
           </p>
           <div id="addIntentStatus"></div>
           <form id="intentAddForm">
-            <label for="nameAdd">Custom intent name:</label>
+            <label id="label-nameAdd" for="nameAdd">Custom intent name:</label>
             <input type="text" name="nameAdd" id="nameAdd" /><br />
-            <label for="descriptionAdd">Custom intent description:</label>
+            <label id="label-descriptionAdd" for="descriptionAdd">Custom intent description:</label>
             <input type="text" name="descriptionAdd" id="descriptionAdd" /><br />
-            <label for="utterancesAdd">Utterances that will trigger the intent (separated by
+            <label id="label-utterancesAdd" for="utterancesAdd">Utterances that will trigger the intent (separated by
               ,):</label>
             <input type="text" name="utterancesAdd" id="utterancesAdd" /><br />
             <div id="intentAddSelect"></div>
-            <label for="paramnameAdd">Intent parameter name (not required):</label>
+            <label id="label-paramnameAdd" for="paramnameAdd">Intent parameter name (not required):</label>
             <input type="text" name="paramnameAdd" id="paramnameAdd" /><br />
-            <label for="paramvalueAdd">Intent parameter value (not required):</label>
+            <label id="label-paramvalueAdd" for="paramvalueAdd">Intent parameter value (not required):</label>
             <input type="text" name="paramvalueAdd" id="paramvalueAdd" /><br />
-            <label for="execAdd">Path to script/program to execute after sending intent (not
+            <label id="label-execAdd" for="execAdd">Path to script/program to execute after sending intent (not
               required):</label>
             <input type="text" name="execAdd" id="execAdd" /><br />
-            <label for="execAdd">Arguments for script/program (seperated by ,) (not required):</label>
+            <label id="label-execAddArgs" for="execAddArgs">Arguments for script/program (seperated by ,) (not required):</label>
             <input type="text" name="execAddArgs" id="execAddArgs" size="50" /><br />
-            <label for="luaAdd">Lua code to run (not required):</label>
+            <label id="label-luaAdd" for="luaAdd">Lua code to run (not required):</label>
             <textarea id="luaAdd"></textarea>
           </form>
-          <div>
-            <button onclick="sendIntentAdd()">Add intent</button>
+          <div id="div-btn-add-intent">
+            <button id="btn-add-intent" onclick="sendIntentAdd()">Add intent</button>
           </div>
-          <hr />
+          <hr id="hr-intent-add" />
         </div>
 
         <h2 id="foldable-edit" onclick="toggleSection('content-edit', 'content-add')">
-          <span>+</span>
+          <span id="foldable-edit-span">+</span>
           Edit/delete a custom intent
         </h2>
-        <div class="content" id="content-edit">
+        <div id="content-edit" style="display: none">
           <div id="editSelect"></div>
           <div id="editIntentStatus"></div>
           <div id="deleteIntentStatus"></div>
-          <div>
+          <div id="div-btn-edit-actions">
             <div>
-              <button onclick="editFormCreate()">Edit selected intent</button>
-              <button onclick="deleteSelectedIntent()">
+              <button id="btn-edit-intent" onclick="editFormCreate()">Edit selected intent</button>
+              <button id="btn-delete-intent" onclick="deleteSelectedIntent()">
                 Delete selected intent
               </button>
             </div>
           </div>
           <div id="editIntentForm"></div>
-          <hr />
+          <hr id="hr-intent-edit" />
         </div>
       </div>
 
       <div id="section-botauth" style="display: none">
-        <h2>Authentication</h2>
-        <hr class="small-hr">
-        <div>
+        <h2 id="title-auth">Authentication</h2>
+        <hr id="hr-auth-header">
+        <div id="div-disconnect">
           <div id="disconnectButton"></div>
         </div>
-        <div>
+        <div id="div-botauth">
           <div id="botAuth"></div>
         </div>
-        <hr />
-        <div>
-          <h3>Configure an OSKR/dev-unlocked robot</h3>
-          <hr class="small-hr">
-          <small class="desc">Works with firmware 1.4 and above.</small>
+        <hr id="hr-auth-mid" />
+        <div id="div-oskr">
+          <h3 id="title-oskr">Configure an OSKR/dev-unlocked robot</h3>
+          <hr id="hr-oskr-header">
+          <small id="oskr-help-text">Works with firmware 1.4 and above.</small>
           <div id="oskrSetupProgress"></div>
           <div id="oskrSetup">
-            <p><b>If you have an OSKR/dev-unlocked bot;</b> enter the bot's IP
+            <p id="oskr-explainer"><b>If you have an OSKR/dev-unlocked bot;</b> enter the bot's IP
               address and upload the bot's SSH key here, then click "Set up
               bot". After that, use the above section to finish setting up
               your bot.</p>
-            <hr class="small-hr">
-            <input class="tinput" type="text" id="sshIp" name="sshIp" placeholder="Bot IP address" /><br />
+            <hr id="hr-oskr-input-sep">
+            <input type="text" id="sshIp" name="sshIp" placeholder="Bot IP address" /><br />
             <input type="file" id="sshKeyFile" name="sshKeyFile" /><br />
-            <hr class="small-hr">
-            <button onclick="doSSHSetup()">Set up bot</button>
+            <hr id="hr-oskr-action-sep">
+            <button id="btn-ssh-setup" onclick="doSSHSetup()">Set up bot</button>
           </div>
         </div>
-        <hr />
+        <hr id="hr-auth-bottom" />
       </div>
 
       <div id="section-log" style="display: none">
-        <h2>Log</h2>
-        <hr class="small-hr">
-        <div class="center">
-          <div style="text-align:left">
+        <h2 id="title-log">Log</h2>
+        <hr id="hr-log-header">
+        <div id="div-log-controls">
+          <div id="div-log-inputs" style="text-align:left">
             <input id="logdebug" name="logdebug" type="checkbox" />
-            <label class="checkbox-label" for="logdebug">Show all logs</label><br />
+            <label id="label-logdebug" for="logdebug">Show all logs</label><br />
             <input id="logscrollbottom" name="logscrollbottom" type="checkbox" />
-            <label class="checkbox-label" for="logscrollbottom">Scroll to bottom</label>
+            <label id="label-logscrollbottom" for="logscrollbottom">Scroll to bottom</label>
           </div>
         </div>
         <textarea id="botTranscriptedTextArea" rows="7" cols="50">
           loading log...
         </textarea>
-        <hr class="log-hr" />
+        <hr id="hr-log-footer" />
       </div>
 
       <div id="section-version" style="display: none">
-        <h2>Version</h2>
-        <hr class="small-hr">
+        <h2 id="title-version">Version</h2>
+        <hr id="hr-version-header">
         <div id="versionDiv">
-          <button onclick="checkUpdate()">
+          <button id="btn-check-update" onclick="checkUpdate()">
             Check For Update
           </button>
-          <hr class="small-hr">
+          <hr id="hr-version-mid">
           <p id="cVersion"></p>
-          <small class="desc" style="display: none;" id="cCommit"></small>
+          <small id="cCommit" style="display: none;"></small>
           <p id="aUpdate"></p>
           <a id="updateGuideLink" style="display: none" target="_blank"
             href="https://github.com/kercre123/wire-pod/wiki/Things-to-Know#updating-wire-pod">Update Guide</a>
         </div>
-        <hr />
+        <hr id="hr-version-bottom" />
       </div>
 
       <div id="section-uicustomizer" style="display: none">
-        <h2>UI Customizer</h2>
-        <hr class="small-hr">
-        <p>Accent Color</p>
+        <h2 id="title-ui-customizer">UI Customizer</h2>
+        <hr id="hr-ui-header">
+        <p id="label-accent-color">Accent Color</p>
         <select onchange="setUIColor()" id="accent-color-choose">
           <option value="teal" selected="selected">Teal (default)</option>
           <option value="orange">Orange</option>
@@ -196,13 +197,13 @@
           <option value="purple">Purple</option>
           <option value="green">Green</option>
         </select>
-        <hr class="small-hr">
-        <p>Body Font</p>
+        <hr id="hr-ui-mid">
+        <p id="label-body-font">Body Font</p>
         <select onchange="setUIFont()" id="body-font-choose">
           <option style="font-family: 'DroidSans';" value="droidsans" selected="selected">Droid Sans (default)</option>
           <option style="font-family: 'IBMVGA';" value="ibmvga">IBM VGA 8x16 (retro)</option>
         </select>
-        <hr />
+        <hr id="hr-ui-bottom" />
       </div>
 
     </div>

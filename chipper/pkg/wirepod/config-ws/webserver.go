@@ -74,11 +74,31 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 		handleGetProductivityAPI(w)
 	case "test_productivity_reminder":
 		handleTestProductivityReminder(w, r)
+	case "get_ui_config":
+		handleGetUIConfig(w)
+	case "set_ui_config":
+		handleSetUIConfig(w, r)
 	case "is_api_v3":
 		fmt.Fprintf(w, "it is!")
 	default:
 		http.Error(w, "not found", http.StatusNotFound)
 	}
+}
+
+func handleGetUIConfig(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(vars.UIConfig)
+}
+
+func handleSetUIConfig(w http.ResponseWriter, r *http.Request) {
+	var config vars.UIConfigStruct
+	if err := json.NewDecoder(r.Body).Decode(&config); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	vars.UIConfig.Theme = config.Theme
+	vars.WriteUIConfig()
+	fmt.Fprint(w, "UI Config updated.")
 }
 
 func handleAddCustomIntent(w http.ResponseWriter, r *http.Request) {

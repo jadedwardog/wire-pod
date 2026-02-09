@@ -2,7 +2,6 @@
 <html>
 
 <head>
-    
   <title>Wire-Pod Initial Setup</title>
   <!-- Meta Apple tags for a PWA like experience. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,21 +17,21 @@
 
 <body>
   <div id="outer">
-    <div id="content" class="">
-      <h1>Wire-Pod Setup</h1>
-      <hr />
+    <div id="content">
+      <h1 id="title-setup">Wire-Pod Setup</h1>
+      <hr id="hr-top" />
       <div id="setup-status"></div>
       <div id="config-options" style="display: block">
-        <p>
+        <p id="p-welcome">
           Welcome to wire-pod! Configure these
           options to your liking then click the "Submit Settings" button at the
           bottom to finish setting up wire-pod.
         </p>
-        <hr />
+        <hr id="hr-intro" />
         <div id="section-conn" style="display: block">
-          <h3>Connection Method</h3>
-          <hr class="small-hr">
-          <div class="center" id="connStatus"></div>
+          <h3 id="title-conn">Connection Method</h3>
+          <hr id="hr-conn-header">
+          <div id="connStatus"></div>
           <select onchange="checkConn()" name="connSelection" id="connSelection">
             <option value="ep">
               Escape Pod (recommended for regular, production robots)
@@ -41,17 +40,17 @@
               IP Address (recommended for OSKR/dev-unlocked robots)
             </option>
           </select>
-          <div class="center" id="portViz" style="display: none">
-            <label for="portInput">Input custom port here (default is 443)</label>
+          <div id="portViz" style="display: none">
+            <label id="label-port" for="portInput">Input custom port here (default is 443)</label>
             <input type="text" id="portInput" name="portInput" placeholder="443" />
           </div>
-          <hr />
+          <hr id="hr-conn-footer" />
         </div>
 
         <div id="section-language" style="display: none">
-          <h3>Speech-to-Text Language</h3>
-          <hr class="small-hr">
-          <div class="center" id="languageStatus"></div>
+          <h3 id="title-language">Speech-to-Text Language</h3>
+          <hr id="hr-language-header">
+          <div id="languageStatus"></div>
           <div id="languageSelectionDiv">
             <select name="languageSelection" id="languageSelection">
               <option value="en-US">English (US)</option>
@@ -70,14 +69,14 @@
               <option value="vi-VN">VietNamese (VN)</option>
             </select>
           </div>
-          <hr />
+          <hr id="hr-language-footer" />
         </div>
 
-        <small class="desc">Weather and Knowledge Graph settings can be configured in the Server Settings page once
+        <small id="desc-server-settings">Weather and Knowledge Graph settings can be configured in the Server Settings page once
           wire-pod is set up.</small>
-        <hr />
+        <hr id="hr-submit" />
 
-        <button onclick="sendSetupInfo()">
+        <button id="btn-submit" onclick="sendSetupInfo()">
           Submit Settings
         </button>
       </div>
