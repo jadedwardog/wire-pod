@@ -1,3 +1,5 @@
+@import url("../../css/wing.css");
+
 * {
     box-sizing: border-box;
     margin: 0;
@@ -75,6 +77,8 @@ body {
     inset: 0;
     opacity: 0.2;
     pointer-events: none;
+    background-image: linear-gradient(0deg, transparent 24%, rgba(57, 255, 20, .3) 25%, rgba(57, 255, 20, .3) 26%, transparent 27%, transparent 74%, rgba(57, 255, 20, .3) 75%, rgba(57, 255, 20, .3) 76%, transparent 77%, transparent), linear-gradient(90deg, transparent 24%, rgba(57, 255, 20, .3) 25%, rgba(57, 255, 20, .3) 26%, transparent 27%, transparent 74%, rgba(57, 255, 20, .3) 75%, rgba(57, 255, 20, .3) 76%, transparent 77%, transparent);
+    background-size: 50px 50px;
 }
 
 #eyes-container {
@@ -174,6 +178,7 @@ body {
     align-items: flex-end;
     padding-right: 5rem;
     pointer-events: none;
+    overflow: visible;
 }
 
 .screen { 
@@ -185,6 +190,9 @@ body {
 .perspective-container {
     position: relative;
     perspective: 1000px;
+    width: 100%;
+    display: flex;
+    justify-content: flex-end;
 }
 
 #main-menu-list {
@@ -210,6 +218,7 @@ body {
     font-weight: 900;
     letter-spacing: 0.1em;
     background-clip: text;
+    white-space: nowrap;
 }
 
 .menu-icon {
@@ -220,6 +229,7 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 1.5rem;
+    flex-shrink: 0;
 }
 
 .menu-item.active {
@@ -335,6 +345,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 400px !important;
+    overflow-y: auto;
 }
 
 .screen.info-panel-body.active {
@@ -389,3 +400,87 @@ body {
 }
 .btn-a { background-color: #39ff14; border-color: #39ff14; }
 .btn-b { background-color: #b83838; border-color: #b83838; }
+
+input[type="text"], 
+input[type="password"], 
+input[type="number"],
+select, 
+textarea {
+    background-color: #0a140a !important;
+    color: #39ff14 !important;
+    border: 1px solid #2b5c2b !important;
+    padding: 0.5rem !important;
+    font-family: 'Courier New', Courier, monospace !important;
+    margin-bottom: 0.5rem;
+    width: 100%;
+    max-width: 100%;
+    border-radius: 0;
+}
+
+input[type="text"]:focus, 
+select:focus, 
+textarea:focus {
+    outline: none;
+    border-color: #39ff14 !important;
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+}
+
+button {
+    background-color: #1f3f1f;
+    color: #39ff14;
+    border: 1px solid #2b5c2b;
+    padding: 0.5rem 1rem;
+    font-family: 'Courier New', Courier, monospace;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+button:hover {
+    background-color: #39ff14;
+    color: black;
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
+}
+
+label {
+    display: block;
+    color: #4a8a4a;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+    margin-top: 0.5rem;
+}
+
+hr {
+    border-color: #2b5c2b;
+    opacity: 0.5;
+    margin: 1rem 0;
+}
+
+#outer {
+    height: auto !important;
+    min-height: 100vh;
+    padding: 2rem;
+    overflow-y: auto;
+}
+
+#content {
+    max-width: 800px;
+    margin: 0 auto;
+    background: rgba(0, 20, 0, 0.8);
+    border: 1px solid #2b5c2b;
+    padding: 2rem;
+    box-shadow: 0 0 30px rgba(0,0,0,0.8);
+}
+
+#botTranscriptedTextArea {
+    width: 100%;
+    height: 200px;
+    font-size: 0.8rem;
+}
+
+#botAuth {
+    margin-top: 1rem;
+    padding: 1rem;
+    border: 1px dashed #2b5c2b;
+}

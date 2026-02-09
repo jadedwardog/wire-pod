@@ -7,7 +7,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#1e1e1e">
-  <link rel="stylesheet" type="text/css" href="css/style.css" />
+  
+  <style>
+    html { background-color: #1e1e1e; }
+    body { visibility: hidden; opacity: 0; transition: opacity 0.2s ease-in; }
+  </style>
+
+  <script src="js/theme-loader.js"></script>
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <script src="https://kit.fontawesome.com/7508f396ac.js" crossorigin="anonymous"></script>
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
@@ -38,7 +45,7 @@
         </div>
         <div id="nav-item-lang">
           <a id="link-lang" href="#" onclick="showLanguage(); return false;"><i class="fa-solid fa-language" id="icon-Language"
-              name="icon"></i><br />Set Language</a>
+              name="icon"></i><br />Language</a>
         </div>
         <!--<div id="nav-item-restart"><a href="#" onclick="showRestart(); return false;"><i class="fa solid fa-arrow-rotate-right" id="icon-Restart" name="icon"></i><br/>Restart Wire-Pod</a></div> -->
       </div>
